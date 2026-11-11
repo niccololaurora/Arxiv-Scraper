@@ -252,8 +252,6 @@ input[type="search"]:focus, select:focus {
   margin-bottom: 0.75rem;
 }
 .results-head h2 { margin: 0; font-size: 1.02rem; font-weight: 600; }
-.sort { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
-.sort select { width: auto; font-size: 0.75rem; padding: 0.25rem 0.4rem; }
 
 .active-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
 

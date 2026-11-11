@@ -12,7 +12,6 @@ const state = {
   selected: new Set(),
   mode: "any",
   query: "",
-  sort: "date",
   page: 1,
 };
 
@@ -95,12 +94,14 @@ function cutoff() {
   return new Date(state.newest.getTime() - state.days * 86400000);
 }
 
+/** state.papers arrives newest-first from the scraper, so filtering preserves
+ *  the chronological order and nothing needs re-sorting. */
 function currentResults() {
   const since = cutoff();
   const terms = parseQuery(state.query);
   const selected = [...state.selected];
 
-  const results = state.papers.filter((paper) => {
+  return state.papers.filter((paper) => {
     if (new Date(paper.published) < since) return false;
     if (!matchesQuery(paper, terms)) return false;
     if (!selected.length) return true;
@@ -109,14 +110,6 @@ function currentResults() {
       ? selected.every((id) => hits.has(id))
       : selected.some((id) => hits.has(id));
   });
-
-  if (state.sort === "relevance") {
-    results.sort((a, b) => {
-      const score = (paper) => state.matches.get(paper.id).size;
-      return score(b) - score(a) || b.published.localeCompare(a.published);
-    });
-  }
-  return results;
 }
 
 /** Per-topic counts within the current time window, ignoring topic selection. */
@@ -293,7 +286,6 @@ function syncUrl() {
   if (state.selected.size) params.set("topics", [...state.selected].join(","));
   if (state.mode !== "any") params.set("mode", state.mode);
   if (state.query) params.set("q", state.query);
-  if (state.sort !== "date") params.set("sort", state.sort);
   history.replaceState(null, "", `?${params}`);
 }
 
@@ -306,10 +298,8 @@ function restoreFromUrl() {
   }
   if (params.get("mode") === "all") state.mode = "all";
   state.query = params.get("q") || "";
-  if (params.get("sort") === "relevance") state.sort = "relevance";
 
   el("query").value = state.query;
-  el("sort").value = state.sort;
   for (const button of el("window-select").children) {
     button.classList.toggle("active", Number(button.dataset.days) === state.days);
   }
@@ -378,12 +368,6 @@ function wireEvents() {
     state.page = 1;
     render();
   }, 200));
-
-  el("sort").addEventListener("change", (event) => {
-    state.sort = event.target.value;
-    state.page = 1;
-    render();
-  });
 
   el("pager").addEventListener("click", (event) => {
     if (event.target.id === "prev") state.page -= 1;
