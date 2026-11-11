@@ -62,9 +62,11 @@ function indexPapers() {
 /* ---------- free-text query ---------- */
 
 /** Split into bare words and "quoted phrases"; every term must appear.
- *  Terms stay prefix-matchable so typing "entangl" already narrows the list,
- *  but spaces and hyphens are interchangeable: "spin squeezing" also finds
- *  "spin-squeezing". */
+ *  A term is anchored at the start of a word but left open at the end, which
+ *  is the only combination that gets all three of these right:
+ *    "entangl"        still narrows while you type -> entanglement
+ *    "ion"            means ions, not dimens(ion)s or informat(ion)
+ *    "spin squeezing" also finds "spin-squeezing" (hyphens == spaces) */
 function parseQuery(raw) {
   const terms = [];
   const pattern = /"([^"]+)"|(\S+)/g;
@@ -72,7 +74,8 @@ function parseQuery(raw) {
   while ((match = pattern.exec(raw)) !== null) {
     const text = (match[1] || match[2]).trim();
     if (!text) continue;
-    const source = escapeRegex(text).replace(/\\?[-\s]+/g, "[\\s-]+");
+    const body = escapeRegex(text).replace(/\\?[-\s]+/g, "[\\s-]+");
+    const source = (/^\w/.test(text) ? "\\b" : "") + body;
     terms.push({ text, regex: new RegExp(source, "i") });
   }
   return terms;

@@ -32,6 +32,13 @@ Dettagli che vale la pena conoscere:
 - Il matching delle keyword tollera singolare/plurale (`surface code` trova anche
   `surface codes`) e tratta trattini e spazi come equivalenti (`non-Markovian` =
   `non Markovian`).
+- La ricerca libera guarda **titolo, abstract e nomi degli autori** (quindi
+  `Tomamichel` funziona come ricerca per autore). I termini sono ancorati
+  all'inizio di parola ma aperti alla fine: `ion` trova `ions` e `trapped-ion`
+  ma non `dimensions`, mentre digitando `entangl` i risultati si restringono
+  già. Più termini si combinano in AND; le virgolette tengono insieme una frase,
+  quindi `spin squeezing` (due termini) e `"spin squeezing"` (frase) danno
+  risultati diversi.
 - Lo stato dei filtri finisce nell'URL, quindi una vista filtrata è condivisibile:
   `?days=7&topics=qec,qml&mode=all`.
 
