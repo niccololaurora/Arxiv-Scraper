@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>quant-ph topic scanner</title>
 <meta name="description" content="Browse by topic the quant-ph papers posted to arXiv in the last day, week or month.">
-<link rel="stylesheet" href="style.css">
+<!-- ?v= is rewritten to the commit sha at deploy time: without it a browser can
+     pair a cached app.js with a fresh index.html and break on a renamed id. -->
+<link rel="stylesheet" href="style.css?v=dev">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>">
 </head>
 <body>
@@ -86,6 +88,6 @@
   <p id="freshness" class="freshness"></p>
 </footer>
 
-<script src="app.js"></script>
+<script src="app.js?v=dev"></script>
 </body>
 </html>

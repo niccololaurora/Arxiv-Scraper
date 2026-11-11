@@ -36,6 +36,12 @@ jobs:
       - name: Fetch the last 35 days of quant-ph
         run: python scraper/fetch_arxiv.py --days 35 --out docs/data/papers.json
 
+      # Pages serves assets with max-age=600, so for ten minutes after a deploy
+      # a browser can pair a cached app.js with a fresh index.html. Stamping the
+      # commit sha onto the asset URLs makes each deploy fetch its own pair.
+      - name: Stamp asset versions with the commit sha
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" docs/index.html
+
       # upload-pages-artifact and deploy-pages must stay on matching majors:
       # an older uploader writes artifact metadata the newer deployer cannot
       # read, which surfaces as "No artifacts named github-pages were found".

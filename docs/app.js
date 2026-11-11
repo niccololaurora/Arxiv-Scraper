@@ -386,21 +386,37 @@ function wireEvents() {
 
 /* ---------- boot ---------- */
 
+function showFailure(heading, body, error) {
+  el("result-count").textContent = heading;
+  el("papers").innerHTML = `<p class="empty-state">${body}</p>`;
+  console.error(error);
+}
+
 async function main() {
   document.documentElement.dataset.theme =
     localStorage.getItem("theme") ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 
+  let payload, taxonomy;
   try {
     const [papersResponse, topicsResponse] = await Promise.all([
       fetch("data/papers.json"),
       fetch("data/topics.json"),
     ]);
     if (!papersResponse.ok || !topicsResponse.ok) throw new Error("fetch failed");
+    payload = await papersResponse.json();
+    taxonomy = await topicsResponse.json();
+  } catch (error) {
+    return showFailure("Could not load the data",
+      `Unable to read <code>data/papers.json</code>.<br>
+       If you opened the file locally, serve the folder with
+       <code>python3 -m http.server</code> instead.`, error);
+  }
 
-    const payload = await papersResponse.json();
-    const taxonomy = await topicsResponse.json();
-
+  // Kept apart from the fetch above: a crash in here is a bug or a stale
+  // cached script, and blaming the data file would send you hunting in the
+  // wrong place — as it did when a cached app.js met a newer index.html.
+  try {
     state.papers = payload.papers;
     state.groups = taxonomy.groups;
     state.newest = new Date(payload.papers[0].published);
@@ -417,24 +433,21 @@ async function main() {
     restoreFromUrl();
     wireEvents();
     render();
-
-    // The group panel is a bonus: a missing or broken group.json must not
-    // take the rest of the page down with it.
-    try {
-      const groupResponse = await fetch("data/group.json");
-      if (!groupResponse.ok) throw new Error("no group data");
-      renderGroup(await groupResponse.json());
-    } catch (groupError) {
-      document.querySelector(".group-panel")?.remove();
-      console.warn("group panel unavailable:", groupError);
-    }
   } catch (error) {
-    el("result-count").textContent = "Could not load the data";
-    el("papers").innerHTML = `<p class="empty-state">
-      Unable to read <code>data/papers.json</code>.<br>
-      If you opened the file locally, serve the folder with <code>python3 -m http.server</code> instead.
-    </p>`;
-    console.error(error);
+    return showFailure("Something went wrong displaying the data",
+      `The data loaded, but the page failed to render it.<br>
+       Try a hard refresh (<code>Ctrl/Cmd + Shift + R</code>) to clear a stale script.`, error);
+  }
+
+  // The group panel is a bonus: a missing or broken group.json must not take
+  // the rest of the page down with it.
+  try {
+    const groupResponse = await fetch("data/group.json");
+    if (!groupResponse.ok) throw new Error("no group data");
+    renderGroup(await groupResponse.json());
+  } catch (groupError) {
+    document.querySelector(".group-panel")?.remove();
+    console.warn("group panel unavailable:", groupError);
   }
 }
 
