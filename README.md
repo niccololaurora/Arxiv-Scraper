@@ -21,7 +21,7 @@ scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
 - **`scraper/fetch_arxiv.py`** — pages through the arXiv API over a
   `submittedDate` window, deduplicates, and writes a compact JSON. Standard
   library only, and it honours the 3 s delay arXiv asks for between calls.
-- **`docs/data/topics.json`** — the topic taxonomy: ~37 topics in 5 groups, each
+- **`docs/data/topics.json`** — the topic taxonomy: 22 topics in 5 groups, each
   with its own keywords. **It is meant to be edited by hand** (see below).
 - **`docs/app.js`** — computes each paper's topics once at load time, after
   which every filter is a set lookup.
@@ -89,8 +89,12 @@ A few caveats:
 - `id` values appear in shared URLs, so renaming one breaks existing links —
   change the `label` freely, but keep the `id`.
 
-On the most recent week of data this taxonomy classifies about 93% of papers;
-the remainder are typically maths or hep-th cross-lists.
+The taxonomy is deliberately focused on the group's own areas rather than on
+covering all of quant-ph, so on the most recent week of data it tags about 79%
+of papers. What falls through is mostly maths and nuclear cross-lists, plus the
+subfields intentionally left out (QKD, quantum networks, complexity,
+condensed-matter many-body, lattice QFT, control, benchmarking, compilation).
+Adding any of them back is a matter of appending one entry to this file.
 
 ---
 
