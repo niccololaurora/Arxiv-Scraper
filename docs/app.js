@@ -152,14 +152,14 @@ function highlight(text, terms) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("it-IT", {
+  return new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric", month: "short", year: "numeric",
   });
 }
 
 function formatAuthors(authors) {
   if (authors.length <= 6) return authors.join(", ");
-  return `${authors.slice(0, 5).join(", ")} + altri ${authors.length - 5}`;
+  return `${authors.slice(0, 5).join(", ")} + ${authors.length - 5} more`;
 }
 
 function renderTopics() {
@@ -190,7 +190,7 @@ function renderActiveFilters() {
     return `<button class="chip" data-topic="${id}">${escapeHtml(topic.label)} <span>×</span></button>`;
   });
   el("active-filters").innerHTML = chips.length
-    ? `${chips.join("")}<span class="chip-note">${state.mode === "all" ? "tutti richiesti" : "almeno uno"}</span>`
+    ? `${chips.join("")}<span class="chip-note">${state.mode === "all" ? "all required" : "any of them"}</span>`
     : "";
 }
 
@@ -202,8 +202,8 @@ function renderPapers(results) {
 
   if (!results.length) {
     el("papers").innerHTML = `<p class="empty-state">
-      Nessun paper corrisponde ai filtri in questa finestra temporale.<br>
-      Prova ad allargare la finestra o a rimuovere qualche argomento.
+      No paper matches these filters in this time window.<br>
+      Try a wider window, or drop one of the topics.
     </p>`;
     el("pager").innerHTML = "";
     return;
@@ -245,17 +245,18 @@ function renderPapers(results) {
     .join("");
 
   el("pager").innerHTML = pages > 1
-    ? `<button id="prev" ${state.page === 1 ? "disabled" : ""}>← precedenti</button>
-       <span>pagina ${state.page} di ${pages}</span>
-       <button id="next" ${state.page === pages ? "disabled" : ""}>successivi →</button>`
+    ? `<button id="prev" ${state.page === 1 ? "disabled" : ""}>← previous</button>
+       <span>page ${state.page} of ${pages}</span>
+       <button id="next" ${state.page === pages ? "disabled" : ""}>next →</button>`
     : "";
 }
 
 function render() {
   const results = currentResults();
-  const label = { 1: "nell'ultimo giorno", 7: "nell'ultima settimana", 30: "nell'ultimo mese" }[state.days];
-  el("result-count").textContent =
-    `${results.length} paper ${label}${state.selected.size || state.query ? " con questi filtri" : ""}`;
+  const window = { 1: "in the last day", 7: "in the last week", 30: "in the last month" }[state.days];
+  const noun = results.length === 1 ? "paper" : "papers";
+  const filtered = state.selected.size || state.query ? " matching your filters" : "";
+  el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}`;
   renderTopics();
   renderActiveFilters();
   renderPapers(results);
@@ -403,18 +404,18 @@ async function main() {
 
     const generated = new Date(payload.generated_at);
     el("freshness").textContent =
-      `${payload.count} paper · aggiornato ${generated.toLocaleDateString("it-IT")} ${generated.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`;
+      `${payload.count} papers · updated ${formatDate(payload.generated_at)} ${generated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
     el("window-hint").textContent =
-      `Calcolata dall'ultima submission (${formatDate(payload.papers[0].published)}), non dall'ora corrente.`;
+      `Measured from the latest submission (${formatDate(payload.papers[0].published)}), not from the current time.`;
 
     restoreFromUrl();
     wireEvents();
     render();
   } catch (error) {
-    el("result-count").textContent = "Impossibile caricare i dati";
+    el("result-count").textContent = "Could not load the data";
     el("papers").innerHTML = `<p class="empty-state">
-      Non riesco a leggere <code>data/papers.json</code>.<br>
-      Se stai aprendo il file in locale, servi la cartella con <code>python3 -m http.server</code>.
+      Unable to read <code>data/papers.json</code>.<br>
+      If you opened the file locally, serve the folder with <code>python3 -m http.server</code> instead.
     </p>`;
     console.error(error);
   }

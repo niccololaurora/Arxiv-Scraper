@@ -2,16 +2,16 @@
   "_comment": "Curated quant-ph taxonomy. Keywords match case-insensitively on title+abstract, with word boundaries, interchangeable hyphens/spaces and an optional trailing plural ('surface code' also hits 'surface codes'). Keep acronyms long enough to avoid false positives (QEC is fine, QC is not). Edit freely: the site reads this file at load time, no need to re-run the scraper.",
   "groups": [
     {
-      "name": "Algoritmi e software",
+      "name": "Algorithms & software",
       "topics": [
         {
           "id": "quantum-algorithms",
-          "label": "Algoritmi quantistici",
+          "label": "Quantum algorithms",
           "keywords": ["quantum algorithm", "quantum speedup", "Grover", "amplitude amplification", "amplitude estimation", "quantum Fourier transform", "Shor's algorithm", "HHL", "phase estimation", "quantum linear system", "quantum subroutine", "oracle query"]
         },
         {
           "id": "variational",
-          "label": "Algoritmi variazionali (VQE / QAOA)",
+          "label": "Variational algorithms (VQE / QAOA)",
           "keywords": ["variational quantum", "VQE", "QAOA", "variational algorithm", "ansatz", "parameterized quantum circuit", "parametrized quantum circuit", "barren plateau", "quantum approximate optimization", "cost function landscape"]
         },
         {
@@ -21,17 +21,17 @@
         },
         {
           "id": "quantum-chemistry",
-          "label": "Chimica quantistica",
+          "label": "Quantum chemistry",
           "keywords": ["quantum chemistry", "electronic structure", "molecular Hamiltonian", "ground state energy", "qubit mapping", "Jordan-Wigner", "Bravyi-Kitaev", "coupled cluster", "orbital", "FeMoco", "perturbation theory", "configuration interaction", "density functional"]
         },
         {
           "id": "annealing",
-          "label": "Annealing e ottimizzazione",
+          "label": "Annealing & optimization",
           "keywords": ["quantum annealing", "adiabatic quantum", "QUBO", "Ising machine", "D-Wave", "combinatorial optimization", "quantum optimization", "linear optimization", "max-cut"]
         },
         {
           "id": "compilation",
-          "label": "Compilazione, software e verifica",
+          "label": "Compilation, software & verification",
           "keywords": ["circuit compilation", "transpilation", "qubit routing", "gate synthesis", "circuit optimization", "qubit mapping", "ZX-calculus", "circuit cutting", "T-count", "magic state distillation", "Clifford+T", "circuit depth", "equivalence checking", "formal verification", "quantum software", "Qiskit", "quantum programming", "Pauli propagation", "quantum compiler"]
         },
         {
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "name": "Error correction e noise",
+      "name": "Error correction & noise",
       "topics": [
         {
           "id": "qec",
@@ -61,152 +61,152 @@
         },
         {
           "id": "open-systems",
-          "label": "Sistemi aperti e decoerenza",
+          "label": "Open systems & decoherence",
           "keywords": ["open quantum system", "decoherence", "Lindblad", "master equation", "non-Markovian", "dissipative", "quantum channel noise", "relaxation", "dephasing", "quantum trajectories", "Redfield", "environment coupling", "detailed balance", "self-energy"]
         },
         {
           "id": "benchmarking",
-          "label": "Benchmarking e tomografia",
+          "label": "Benchmarking & tomography",
           "keywords": ["randomized benchmarking", "quantum tomography", "state tomography", "process tomography", "gate set tomography", "benchmarking", "cross-entropy benchmarking", "fidelity estimation", "classical shadow", "shadow tomography", "quantum volume", "certification", "randomized measurement", "state reconstruction"]
         }
       ]
     },
     {
-      "name": "Piattaforme hardware",
+      "name": "Hardware platforms",
       "topics": [
         {
           "id": "superconducting",
-          "label": "Circuiti superconduttivi",
+          "label": "Superconducting circuits",
           "keywords": ["superconducting qubit", "transmon", "fluxonium", "Josephson", "circuit QED", "coplanar waveguide", "parametric amplifier", "SQUID", "tunable coupler", "flux qubit", "superconducting processor"]
         },
         {
           "id": "trapped-ions",
-          "label": "Ioni intrappolati",
+          "label": "Trapped ions",
           "keywords": ["trapped ion", "ion trap", "Paul trap", "Molmer-Sorensen", "Mølmer", "hyperfine qubit", "Yb+", "Ca+", "Ba+", "sympathetic cooling", "ion shuttling"]
         },
         {
           "id": "neutral-atoms",
-          "label": "Atomi neutri e Rydberg",
+          "label": "Neutral atoms & Rydberg",
           "keywords": ["neutral atom", "Rydberg", "optical tweezer", "atom array", "optical lattice", "blockade", "magic wavelength", "tweezer array", "cold atom", "dipolar interaction"]
         },
         {
           "id": "photonics",
-          "label": "Fotonica e ottica lineare",
+          "label": "Photonics & linear optics",
           "keywords": ["photonic qubit", "linear optical", "boson sampling", "single-photon source", "integrated photonics", "squeezed light", "Gaussian boson sampling", "beam splitter", "photon-number resolving", "waveguide", "photonic processor", "photonic circuit"]
         },
         {
           "id": "spin-qubits",
-          "label": "Spin qubit e semiconduttori",
+          "label": "Spin qubits & semiconductors",
           "keywords": ["spin qubit", "quantum dot", "silicon qubit", "donor qubit", "singlet-triplet", "exchange coupling", "germanium hole", "NV center", "nitrogen-vacancy", "colour center", "color center"]
         },
         {
           "id": "topological",
-          "label": "Qubit topologici e Majorana",
+          "label": "Topological qubits & Majorana",
           "keywords": ["topological qubit", "Majorana", "non-Abelian", "anyon", "braiding", "parafermion", "topological order", "Kitaev chain", "fusion rule"]
         },
         {
           "id": "hybrid-mechanics",
-          "label": "Optomeccanica e sistemi ibridi",
+          "label": "Optomechanics & hybrid systems",
           "keywords": ["optomechanic", "nanomechanical", "magnon", "phonon", "levitated", "microwave-to-optical", "transduction", "hybrid quantum system", "acoustic resonator"]
         }
       ]
     },
     {
-      "name": "Informazione e comunicazione",
+      "name": "Information & communication",
       "topics": [
         {
           "id": "entanglement",
-          "label": "Entanglement e nonlocalità",
+          "label": "Entanglement & nonlocality",
           "keywords": ["entanglement", "Bell inequality", "nonlocality", "steering", "CHSH", "separability", "entanglement witness", "negativity", "entanglement entropy", "monogamy", "Schmidt", "quantum correlation", "discord"]
         },
         {
           "id": "info-theory",
-          "label": "Teoria dell'informazione quantistica",
+          "label": "Quantum information theory",
           "keywords": ["channel capacity", "quantum Shannon", "entropic inequality", "resource theory", "quantum relative entropy", "coherent information", "distillable", "majorization", "quantum divergence", "min-entropy", "Rényi", "Renyi", "hypothesis testing", "data processing inequality", "quantum channel", "entropy production", "von Neumann entropy"]
         },
         {
           "id": "learning-theory",
-          "label": "Learning di stati e complessità campionaria",
+          "label": "State learning & sample complexity",
           "keywords": ["sample complexity", "learning quantum state", "state learning", "property testing", "PAC learning", "learning Pauli", "learnability", "query complexity of learning", "quantum advantage in learning", "single-copy measurement"]
         },
         {
           "id": "communication",
-          "label": "Comunicazione e reti quantistiche",
+          "label": "Communication & quantum networks",
           "keywords": ["quantum network", "quantum internet", "quantum repeater", "entanglement distribution", "quantum teleportation", "entanglement swapping", "quantum memory", "satellite quantum", "quantum link", "distributed quantum computing", "distributed quantum"]
         },
         {
           "id": "crypto",
-          "label": "Crittografia quantistica e QKD",
+          "label": "Quantum cryptography & QKD",
           "keywords": ["quantum key distribution", "QKD", "quantum cryptography", "device-independent", "BB84", "twin-field", "post-quantum", "quantum money", "blind quantum computing", "quantum random number", "secret sharing", "oblivious transfer", "quantum verification", "interactive proof"]
         },
         {
           "id": "complexity",
-          "label": "Complessità e quantum advantage",
+          "label": "Complexity & quantum advantage",
           "keywords": ["quantum advantage", "quantum supremacy", "sampling complexity", "BQP", "QMA", "dequantization", "classical simulability", "query complexity", "oracle separation", "hardness of sampling", "computational power", "polynomial-space", "computational complexity"]
         }
       ]
     },
     {
-      "name": "Many-body, metrologia e fondamenti",
+      "name": "Many-body, metrology & foundations",
       "topics": [
         {
           "id": "simulation",
-          "label": "Simulazione quantistica",
+          "label": "Quantum simulation",
           "keywords": ["quantum simulation", "quantum simulator", "Hamiltonian simulation", "Trotter", "digital-analog", "lattice gauge theory", "analog simulator", "qubitization", "quantum signal processing"]
         },
         {
           "id": "many-body",
-          "label": "Many-body e dinamica",
+          "label": "Many-body physics & dynamics",
           "keywords": ["many-body", "thermalization", "many-body localization", "quantum scar", "time crystal", "Floquet", "quench dynamics", "quantum chaos", "measurement-induced phase transition", "Krylov", "operator spreading", "entanglement growth", "spin chain", "Hubbard model", "Heisenberg model", "long-time dynamics"]
         },
         {
           "id": "condensed-matter",
-          "label": "Fasi topologiche e materia condensata",
+          "label": "Topological phases & condensed matter",
           "keywords": ["Chern", "topological phase", "band structure", "quantum Hall", "edge state", "edge channel", "superconductivity", "flat band", "Berry curvature", "quasiparticle", "disorder-induced", "Anderson localization", "quantum fluid", "quantum geometry"]
         },
         {
           "id": "tensor-networks",
-          "label": "Tensor network e metodi classici",
+          "label": "Tensor networks & classical methods",
           "keywords": ["tensor network", "matrix product state", "MPS", "DMRG", "PEPS", "MERA", "neural quantum state", "variational Monte Carlo", "classical simulation of quantum", "Monte Carlo"]
         },
         {
           "id": "continuous-variables",
-          "label": "Variabili continue e stati bosonici",
+          "label": "Continuous variables & bosonic states",
           "keywords": ["continuous variable", "Gaussian state", "non-Gaussian", "non-Gaussianity", "Wigner function", "squeezing", "homodyne", "coherent state", "Fock state", "phase space representation", "bosonic mode", "Rabi model", "two-photon", "quadrature"]
         },
         {
           "id": "metrology",
-          "label": "Metrologia e sensing",
+          "label": "Metrology & sensing",
           "keywords": ["quantum metrology", "quantum sensing", "Heisenberg limit", "Fisher information", "quantum magnetometry", "squeezing-enhanced", "atomic clock", "optical clock", "quantum clock", "interferometry", "parameter estimation", "standard quantum limit", "gravimeter", "quantum imaging", "super-resolution", "quantum illumination", "neutron scattering"]
         },
         {
           "id": "thermodynamics",
-          "label": "Termodinamica quantistica",
+          "label": "Quantum thermodynamics",
           "keywords": ["quantum thermodynamics", "quantum heat engine", "work extraction", "fluctuation theorem", "Maxwell demon", "quantum battery", "ergotropy", "Landauer", "quantum refrigerator", "thermal machine", "thermal transport", "heat transport", "thermal transistor", "energetic cost", "quantum thermal"]
         },
         {
           "id": "optics",
-          "label": "Ottica quantistica e cavity QED",
+          "label": "Quantum optics & cavity QED",
           "keywords": ["cavity QED", "quantum optics", "Jaynes-Cummings", "waveguide QED", "superradiance", "photon blockade", "Dicke model", "polariton", "atom-photon", "optical cavity", "macroscopic QED", "photon correlation", "light-matter interaction", "light-induced"]
         },
         {
           "id": "qft",
-          "label": "QFT, lattice gauge e campi",
+          "label": "QFT, lattice gauge & fields",
           "keywords": ["quantum field theory", "lattice gauge", "gauge theory", "conformal field theory", "renormalization", "scattering amplitude", "Dirac equation", "Casimir", "effective Hamiltonian", "Symanzik", "chiral", "scalar field", "string dynamics", "bootstrap"]
         },
         {
           "id": "foundations",
-          "label": "Fondamenti e misura",
+          "label": "Foundations & measurement",
           "keywords": ["quantum foundations", "contextuality", "interpretation of quantum", "measurement problem", "weak measurement", "wave function collapse", "ontological model", "Kochen-Specker", "quantum Darwinism", "PBR theorem", "causal structure", "indefinite causal order", "quantum reference frame", "hidden variable", "Born rule", "uncertainty relation", "Leggett-Garg", "macroscopic realism", "complementarity", "postselection", "arrow of time", "superoscillation"]
         },
         {
           "id": "control",
-          "label": "Controllo quantistico",
+          "label": "Quantum control",
           "keywords": ["quantum control", "optimal control", "GRAPE", "pulse shaping", "shortcut to adiabaticity", "feedback control", "reinforcement learning control", "calibration", "composite pulse", "robust control", "pulse-level"]
         },
         {
           "id": "gravity",
-          "label": "Gravità quantistica e olografia",
+          "label": "Quantum gravity & holography",
           "keywords": ["holography", "AdS/CFT", "black hole information", "wormhole", "quantum gravity", "holographic", "Page curve", "bulk reconstruction", "gravitational entanglement", "quantum spacetime", "QNEC", "energy condition"]
         }
       ]

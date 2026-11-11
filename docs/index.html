@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>quant-ph topic scanner</title>
-<meta name="description" content="Cerca per argomento i paper quant-ph apparsi su arXiv nell'ultimo giorno, settimana o mese.">
+<meta name="description" content="Browse by topic the quant-ph papers posted to arXiv in the last day, week or month.">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>">
 </head>
@@ -15,41 +15,41 @@
     <span class="logo">⚛</span>
     <div>
       <h1>quant-ph topic scanner</h1>
-      <p class="tagline">Cosa è uscito su <code>arXiv:quant-ph</code>, per argomento</p>
+      <p class="tagline">What's new on <code>arXiv:quant-ph</code>, by topic</p>
     </div>
   </div>
   <div class="topbar-right">
     <span id="freshness" class="freshness"></span>
-    <button id="theme-toggle" class="icon-button" title="Cambia tema" aria-label="Cambia tema">◐</button>
+    <button id="theme-toggle" class="icon-button" title="Toggle theme" aria-label="Toggle theme">◐</button>
   </div>
 </header>
 
 <main>
   <aside class="sidebar">
     <section class="panel">
-      <h2>Finestra temporale</h2>
-      <div class="segmented" id="window-select" role="group" aria-label="Finestra temporale">
-        <button data-days="1" class="active">Ultimo giorno</button>
-        <button data-days="7">Settimana</button>
-        <button data-days="30">Mese</button>
+      <h2>Time window</h2>
+      <div class="segmented" id="window-select" role="group" aria-label="Time window">
+        <button data-days="1" class="active">Last day</button>
+        <button data-days="7">Week</button>
+        <button data-days="30">Month</button>
       </div>
       <p class="hint" id="window-hint"></p>
     </section>
 
     <section class="panel">
-      <h2>Ricerca libera</h2>
-      <input type="search" id="query" placeholder="es. bosonic code, Tomamichel, &quot;spin squeezing&quot;" autocomplete="off">
-      <p class="hint">Cerca in titolo, abstract e <strong>autori</strong>. Tutti i termini devono comparire; le virgolette tengono insieme le frasi.</p>
+      <h2>Search</h2>
+      <input type="search" id="query" placeholder="e.g. bosonic code, Tomamichel, &quot;spin squeezing&quot;" autocomplete="off">
+      <p class="hint">Searches titles, abstracts and <strong>author names</strong>. Every term must appear; quotes keep a phrase together.</p>
     </section>
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Argomenti</h2>
-        <button id="clear-topics" class="link-button">azzera</button>
+        <h2>Topics</h2>
+        <button id="clear-topics" class="link-button">clear</button>
       </div>
-      <div class="segmented small" id="match-mode" role="group" aria-label="Modalità di combinazione">
-        <button data-mode="any" class="active">Almeno uno</button>
-        <button data-mode="all">Tutti</button>
+      <div class="segmented small" id="match-mode" role="group" aria-label="How to combine topics">
+        <button data-mode="any" class="active">Any of them</button>
+        <button data-mode="all">All of them</button>
       </div>
       <div id="topics"></div>
     </section>
@@ -57,12 +57,12 @@
 
   <section class="results">
     <div class="results-head">
-      <h2 id="result-count">Caricamento…</h2>
+      <h2 id="result-count">Loading…</h2>
       <label class="sort">
-        Ordina per
+        Sort by
         <select id="sort">
-          <option value="date">data (più recenti)</option>
-          <option value="relevance">rilevanza</option>
+          <option value="date">date (newest first)</option>
+          <option value="relevance">relevance</option>
         </select>
       </label>
     </div>
@@ -74,9 +74,9 @@
 
 <footer>
   <p>
-    Dati dall'<a href="https://info.arxiv.org/help/api/index.html">API arXiv</a>, aggiornati ogni giorno.
-    Grazie ad arXiv per la disponibilità dell'interoperabilità open access.
-    <a href="https://github.com/niccololaurora/Scraper">Codice su GitHub</a>.
+    Data from the <a href="https://info.arxiv.org/help/api/index.html">arXiv API</a>, refreshed daily.
+    Thank you to arXiv for use of its open access interoperability.
+    <a href="https://github.com/niccololaurora/Scraper">Source on GitHub</a>.
   </p>
 </footer>
 
