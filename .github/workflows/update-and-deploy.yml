@@ -26,9 +26,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -36,11 +36,14 @@ jobs:
       - name: Fetch the last 35 days of quant-ph
         run: python scraper/fetch_arxiv.py --days 35 --out docs/data/papers.json
 
-      - uses: actions/configure-pages@v5
+      # upload-pages-artifact and deploy-pages must stay on matching majors:
+      # an older uploader writes artifact metadata the newer deployer cannot
+      # read, which surfaces as "No artifacts named github-pages were found".
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
