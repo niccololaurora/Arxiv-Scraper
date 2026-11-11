@@ -251,6 +251,28 @@ function renderPapers(results) {
     : "";
 }
 
+/** The group's own recent submissions — a static list, not affected by filters. */
+function renderGroup(payload) {
+  const days = payload.window_days;
+  el("group-hint").innerHTML = payload.group_url
+    ? `Last ${days} days from <a href="${payload.group_url}" target="_blank" rel="noopener">${escapeHtml(payload.group_name)}</a>`
+    : `Last ${days} days`;
+
+  if (!payload.papers.length) {
+    el("group-papers").innerHTML =
+      `<li class="group-empty">No submissions in the last ${days} days.</li>`;
+    return;
+  }
+
+  el("group-papers").innerHTML = payload.papers
+    .map((paper) => `<li class="group-item">
+      <time>${formatDate(paper.published)}</time>
+      <a href="${paper.abs_url}" target="_blank" rel="noopener">${escapeHtml(paper.title)}</a>
+      <p class="group-members">${escapeHtml(paper.members.join(", "))}</p>
+    </li>`)
+    .join("");
+}
+
 function render() {
   const results = currentResults();
   const window = { 1: "in the last day", 7: "in the last week", 30: "in the last month" }[state.days];
@@ -411,6 +433,17 @@ async function main() {
     restoreFromUrl();
     wireEvents();
     render();
+
+    // The group panel is a bonus: a missing or broken group.json must not
+    // take the rest of the page down with it.
+    try {
+      const groupResponse = await fetch("data/group.json");
+      if (!groupResponse.ok) throw new Error("no group data");
+      renderGroup(await groupResponse.json());
+    } catch (groupError) {
+      document.querySelector(".group-panel")?.remove();
+      console.warn("group panel unavailable:", groupError);
+    }
   } catch (error) {
     el("result-count").textContent = "Could not load the data";
     el("papers").innerHTML = `<p class="empty-state">

@@ -13,6 +13,7 @@ import argparse
 import json
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -34,19 +35,26 @@ NS = {
 }
 
 
-def build_query(start: int, since: datetime, until: datetime) -> str:
-    """Build an API query restricted to a submission date window."""
-    window = "submittedDate:[{} TO {}]".format(
+def date_window(since: datetime, until: datetime) -> str:
+    return "submittedDate:[{} TO {}]".format(
         since.strftime("%Y%m%d%H%M"), until.strftime("%Y%m%d%H%M")
     )
+
+
+def build_url(search_query: str, start: int) -> str:
     params = {
-        "search_query": f"{CATEGORY} AND {window}",
+        "search_query": search_query,
         "start": start,
         "max_results": PAGE_SIZE,
         "sortBy": "submittedDate",
         "sortOrder": "descending",
     }
     return f"{API_URL}?{urllib.parse.urlencode(params)}"
+
+
+def build_query(start: int, since: datetime, until: datetime) -> str:
+    """Build an API query restricted to a submission date window."""
+    return build_url(f"{CATEGORY} AND {date_window(since, until)}", start)
 
 
 def fetch_page(url: str) -> str:
@@ -114,17 +122,13 @@ def parse_entry(entry: ET.Element) -> dict | None:
     }
 
 
-def fetch_window(days: int) -> list[dict]:
-    """Page through every quant-ph submission from the last `days` days."""
-    until = datetime.now(timezone.utc)
-    since = until - timedelta(days=days)
-    print(f"Fetching quant-ph submissions from {since:%Y-%m-%d} to {until:%Y-%m-%d}")
-
-    papers: dict[str, dict] = {}
+def fetch_all(search_query: str, papers: dict[str, dict] | None = None) -> dict[str, dict]:
+    """Page through every result of a query, de-duplicated by arXiv id."""
+    papers = {} if papers is None else papers
     start = 0
     while True:
         print(f"  start={start} (collected {len(papers)})")
-        feed = ET.fromstring(fetch_page(build_query(start, since, until)))
+        feed = ET.fromstring(fetch_page(build_url(search_query, start)))
         entries = feed.findall("atom:entry", NS)
         if not entries:
             break
@@ -142,14 +146,120 @@ def fetch_window(days: int) -> list[dict]:
         if total and start >= int(total):
             break
         time.sleep(REQUEST_DELAY)
+    return papers
 
-    return sorted(papers.values(), key=lambda paper: paper["published"], reverse=True)
+
+def by_date(papers) -> list[dict]:
+    return sorted(papers, key=lambda paper: paper["published"], reverse=True)
+
+
+def fetch_window(days: int) -> list[dict]:
+    """Page through every quant-ph submission from the last `days` days."""
+    until = datetime.now(timezone.utc)
+    since = until - timedelta(days=days)
+    print(f"Fetching quant-ph submissions from {since:%Y-%m-%d} to {until:%Y-%m-%d}")
+    return by_date(fetch_all(f"{CATEGORY} AND {date_window(since, until)}").values())
+
+
+# --- group submissions -----------------------------------------------------
+
+def strip_accents(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def name_parts(name: str) -> tuple[str, str]:
+    """('Matteo G. A. Paris') -> ('matteo', 'paris')"""
+    tokens = strip_accents(name).lower().replace(".", " ").split()
+    return (tokens[0], tokens[-1]) if len(tokens) > 1 else ("", tokens[0] if tokens else "")
+
+
+def build_member_index(members: list[dict]) -> dict[tuple[str, str], str]:
+    """Map (first name, surname) -> display name, including any aliases."""
+    index = {}
+    for member in members:
+        for spelling in [member["name"], *member.get("aliases", [])]:
+            index[name_parts(spelling)] = member["name"]
+    return index
+
+
+def match_author(author: str, index: dict[tuple[str, str], str]) -> str | None:
+    """Match on surname plus first name, accepting 'M. Paris' for 'Matteo Paris'.
+
+    Requiring the first name is what keeps common surnames (Sharma, Gupta)
+    from pulling in unrelated authors.
+    """
+    first, last = name_parts(author)
+    for (want_first, want_last), display in index.items():
+        if last != want_last:
+            continue
+        if first == want_first or (len(first) == 1 and first == want_first[:1]):
+            return display
+    return None
+
+
+def in_categories(paper: dict, prefixes: list[str]) -> bool:
+    if not prefixes:
+        return True
+    return any(category.startswith(prefix)
+               for category in paper["categories"] for prefix in prefixes)
+
+
+def fetch_group(members: list[dict], days: int, categories: list[str] | None = None) -> list[dict]:
+    """Fetch recent submissions by group members.
+
+    Names alone cannot identify a person — a LIGO author sharing a member's
+    name matched here — so results are also restricted to `categories`.
+    """
+    until = datetime.now(timezone.utc)
+    since = until - timedelta(days=days)
+    index = build_member_index(members)
+    window = date_window(since, until)
+    categories = categories or []
+
+    print(f"Fetching group submissions by {len(members)} members")
+    collected: dict[str, dict] = {}
+    # Query in small batches: one OR-clause per member makes a very long URL.
+    for batch_start in range(0, len(members), 8):
+        batch = members[batch_start:batch_start + 8]
+        clause = " OR ".join(f'au:"{member["name"]}"' for member in batch)
+        print(f"  members {batch_start + 1}-{batch_start + len(batch)}")
+        fetch_all(f"({clause}) AND {window}", collected)
+        time.sleep(REQUEST_DELAY)
+
+    # The API matches author names loosely, so confirm each hit ourselves.
+    papers, off_topic = [], 0
+    for paper in collected.values():
+        matched = sorted({name for author in paper["authors"]
+                          if (name := match_author(author, index))})
+        if not matched:
+            continue
+        if not in_categories(paper, categories):
+            off_topic += 1
+            print(f"  skipped (categories {paper['categories']}): {paper['title'][:50]}")
+            continue
+        papers.append({**paper, "members": matched})
+
+    print(f"  {len(papers)} confirmed out of {len(collected)} candidates"
+          f" ({off_topic} dropped by the category filter)")
+    return by_date(papers)
+
+
+def write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, separators=(",", ":"))
+    print(f"Wrote {path} ({path.stat().st_size / 1_048_576:.1f} MB)")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--days", type=int, default=35, help="how far back to look")
     parser.add_argument("--out", type=Path, default=Path("docs/data/papers.json"))
+    parser.add_argument("--members", type=Path, default=Path("docs/data/members.json"))
+    parser.add_argument("--group-out", type=Path, default=Path("docs/data/group.json"))
+    parser.add_argument("--group-days", type=int, default=30,
+                        help="window for the group's own submissions")
     args = parser.parse_args()
 
     papers = fetch_window(args.days)
@@ -157,19 +267,28 @@ def main() -> int:
         print("No papers returned; leaving the existing file untouched.", file=sys.stderr)
         return 1
 
-    payload = {
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    write_json(args.out, {
+        "generated_at": generated_at,
         "window_days": args.days,
         "count": len(papers),
         "papers": papers,
-    }
+    })
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False, separators=(",", ":"))
+    if args.members.exists():
+        config = json.loads(args.members.read_text(encoding="utf-8"))
+        group = fetch_group(config["members"], args.group_days, config.get("categories"))
+        write_json(args.group_out, {
+            "generated_at": generated_at,
+            "window_days": args.group_days,
+            "group_name": config.get("group_name", ""),
+            "group_url": config.get("group_url", ""),
+            "count": len(group),
+            "papers": group,
+        })
+    else:
+        print(f"No {args.members}; skipping the group panel.", file=sys.stderr)
 
-    size_mb = args.out.stat().st_size / 1_048_576
-    print(f"Wrote {len(papers)} papers to {args.out} ({size_mb:.1f} MB)")
     return 0
 
 

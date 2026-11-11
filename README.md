@@ -16,6 +16,8 @@ Department of Physics, University of Milan.
 ```
 scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
    arXiv API, stdlib            ~2200 papers             vanilla JS
+                          →  docs/data/group.json
+                             the group's own recent submissions
 ```
 
 - **`scraper/fetch_arxiv.py`** — pages through the arXiv API over a
@@ -23,8 +25,20 @@ scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
   library only, and it honours the 3 s delay arXiv asks for between calls.
 - **`docs/data/topics.json`** — the topic taxonomy: 22 topics in 5 groups, each
   with its own keywords. **It is meant to be edited by hand** (see below).
+- **`docs/data/members.json`** — the group roster, hand-edited. The scraper
+  queries arXiv for these authors and writes `group.json`, which feeds the
+  "From the group" panel on the right.
 - **`docs/app.js`** — computes each paper's topics once at load time, after
   which every filter is a set lookup.
+
+### The group panel
+
+An author matches only if **both** surname and first name agree, so `M. Paris`
+counts for Matteo Paris while `Michel Paris` does not. Names alone still cannot
+identify a person — a LIGO paper by a different Priyanka Sharma matched during
+testing — so results are additionally restricted to the category prefixes
+listed in `members.json`. Widen that list if someone publishes outside it, or
+empty it to turn the filter off.
 
 Details worth knowing:
 

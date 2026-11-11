@@ -1,0 +1,31 @@
+{
+  "_comment": "Members of the Pure and Applied Quantum Mechanics Group (https://sites.unimi.it/aqm/). The scraper queries arXiv for these authors and writes docs/data/group.json. A paper counts as the group's only if an author matches on surname AND on first name (or its initial), so common surnames do not pull in unrelated people. Add 'aliases' when someone publishes under a different spelling.",
+  "group_name": "Pure and Applied Quantum Mechanics",
+  "group_url": "https://sites.unimi.it/aqm/",
+  "_categories_comment": "Name matching cannot tell two physicists apart when they share a name: a LIGO paper by a different Priyanka Sharma matched here. Only papers carrying one of these category prefixes are kept. Widen the list if someone in the group publishes outside it (e.g. add 'gr-qc' for collapse models), or empty it to disable the filter.",
+  "categories": ["quant-ph", "physics.", "cond-mat", "math-ph"],
+  "members": [
+    { "name": "Matteo Paris", "role": "staff" },
+    { "name": "Bassano Vacchini", "role": "staff" },
+    { "name": "Claudia Benedetti", "role": "staff" },
+    { "name": "Simone Cialdi", "role": "staff" },
+    { "name": "Alessandro Ferraro", "role": "staff" },
+    { "name": "Marco Genoni", "role": "staff" },
+    { "name": "Stefano Olivares", "role": "staff" },
+    { "name": "Nicola Piovella", "role": "staff" },
+    { "name": "Andrea Smirne", "role": "staff" },
+    { "name": "Dario Tamascelli", "role": "staff" },
+    { "name": "Matteo Bina", "role": "staff" },
+    { "name": "Daniele Cipriani", "role": "staff" },
+    { "name": "Priyanka Sharma", "role": "postdoc" },
+    { "name": "Maria Popovic", "role": "postdoc" },
+    { "name": "Gaia Forghieri", "role": "postdoc" },
+    { "name": "Rivu Gupta", "role": "postdoc" },
+    { "name": "Eoin O'Connor", "role": "postdoc" },
+    { "name": "Edoardo Suerra", "role": "postdoc" },
+    { "name": "Sara Dornetti", "role": "phd" },
+    { "name": "Pietro Follia", "role": "phd" },
+    { "name": "Niccolò Laurora", "role": "phd", "aliases": ["Niccolo Laurora"] },
+    { "name": "Paolo Luppi", "role": "phd" }
+  ]
+}

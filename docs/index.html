@@ -11,19 +11,12 @@
 <body>
 
 <header class="topbar">
-  <div class="brand">
-    <span class="logo">⚛</span>
-    <div>
-      <h1>quant-ph topic scanner</h1>
-      <p class="tagline">What's new on <code>arXiv:quant-ph</code>, by topic</p>
-    </div>
-  </div>
+  <h1><span class="logo">⚛</span> quant-ph topic scanner<span class="tagline">what's new on <code>arXiv:quant-ph</code>, by topic</span></h1>
   <div class="topbar-right">
     <a class="group-link" href="https://sites.unimi.it/aqm/" target="_blank" rel="noopener">
       Pure &amp; Applied Quantum Mechanics
       <span>University of Milan</span>
     </a>
-    <span id="freshness" class="freshness"></span>
     <button id="theme-toggle" class="icon-button" title="Toggle theme" aria-label="Toggle theme">◐</button>
   </div>
 </header>
@@ -74,6 +67,16 @@
     <div id="papers"></div>
     <div id="pager" class="pager"></div>
   </section>
+
+  <aside class="group-panel">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>From the group</h2>
+      </div>
+      <p class="hint" id="group-hint"></p>
+      <ol id="group-papers" class="group-list"></ol>
+    </section>
+  </aside>
 </main>
 
 <footer>
@@ -87,6 +90,7 @@
     Thank you to arXiv for use of its open access interoperability.
     <a href="https://github.com/niccololaurora/Scraper">Source on GitHub</a>.
   </p>
+  <p id="freshness" class="freshness"></p>
 </footer>
 
 <script src="app.js"></script>
