@@ -1,73 +1,74 @@
 # quant-ph topic scanner
 
-Interfaccia web per vedere quali paper `quant-ph` sono apparsi su arXiv
-**nell'ultimo giorno, settimana o mese**, filtrati per argomento.
+A web interface to see which `quant-ph` papers appeared on arXiv **in the last
+day, week or month**, filtered by topic.
 
-Uno scraper Python gira ogni giorno su GitHub Actions, scarica le submission
-recenti dall'[API arXiv](https://info.arxiv.org/help/api/index.html) e pubblica
-un sito statico su GitHub Pages. Nessun server, nessun database: il filtraggio
-avviene interamente nel browser, quindi è istantaneo.
+A Python scraper runs daily on GitHub Actions, pulls recent submissions from the
+[arXiv API](https://info.arxiv.org/help/api/index.html) and publishes a static
+site to GitHub Pages. No server and no database: all filtering happens in the
+browser, so it is instant.
 
-## Come funziona
+A project of the [Pure and Applied Quantum Mechanics Group](https://sites.unimi.it/aqm/),
+Department of Physics, University of Milan.
+
+## How it works
 
 ```
-scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (sito statico)
-   API arXiv, stdlib             ~2200 paper              vanilla JS
+scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
+   arXiv API, stdlib            ~2200 papers             vanilla JS
 ```
 
-- **`scraper/fetch_arxiv.py`** — pagina l'API arXiv su una finestra di
-  `submittedDate`, deduplica, e scrive un JSON compatto. Solo standard library,
-  rispetta la pausa di 3 s richiesta da arXiv.
-- **`docs/data/topics.json`** — la tassonomia degli argomenti: ~37 topic in 5
-  gruppi, ognuno con le sue keyword. **È fatto per essere modificato a mano**
-  (vedi sotto).
-- **`docs/app.js`** — al caricamento calcola una volta i topic di ogni paper,
-  poi ogni filtro è una lookup su insiemi.
+- **`scraper/fetch_arxiv.py`** — pages through the arXiv API over a
+  `submittedDate` window, deduplicates, and writes a compact JSON. Standard
+  library only, and it honours the 3 s delay arXiv asks for between calls.
+- **`docs/data/topics.json`** — the topic taxonomy: ~37 topics in 5 groups, each
+  with its own keywords. **It is meant to be edited by hand** (see below).
+- **`docs/app.js`** — computes each paper's topics once at load time, after
+  which every filter is a set lookup.
 
-Dettagli che vale la pena conoscere:
+Details worth knowing:
 
-- La finestra temporale è calcolata **dall'ultima submission presente nei dati**,
-  non dall'ora corrente: arXiv pubblica a blocchi giornalieri, quindi un "ultimo
-  giorno" letterale sarebbe vuoto per gran parte della giornata.
-- Il matching delle keyword tollera singolare/plurale (`surface code` trova anche
-  `surface codes`) e tratta trattini e spazi come equivalenti (`non-Markovian` =
-  `non Markovian`).
-- La ricerca libera guarda **titolo, abstract e nomi degli autori** (quindi
-  `Tomamichel` funziona come ricerca per autore). I termini sono ancorati
-  all'inizio di parola ma aperti alla fine: `ion` trova `ions` e `trapped-ion`
-  ma non `dimensions`, mentre digitando `entangl` i risultati si restringono
-  già. Più termini si combinano in AND; le virgolette tengono insieme una frase,
-  quindi `spin squeezing` (due termini) e `"spin squeezing"` (frase) danno
-  risultati diversi.
-- Lo stato dei filtri finisce nell'URL, quindi una vista filtrata è condivisibile:
+- The time window is measured **from the newest submission in the data**, not
+  from the current time: arXiv publishes in daily batches, so a literal "last
+  day" would be empty for most of the day.
+- Keyword matching tolerates singular/plural (`surface code` also finds
+  `surface codes`) and treats hyphens and spaces as equivalent (`non-Markovian`
+  = `non Markovian`).
+- The search box covers **titles, abstracts and author names**, so
+  `Tomamichel` works as an author search. Terms are anchored at the start of a
+  word but left open at the end: `ion` finds `ions` and `trapped-ion` but not
+  `dimensions`, while typing `entangl` already narrows the results. Multiple
+  terms combine with AND, and quotes keep a phrase together — so
+  `spin squeezing` (two terms) and `"spin squeezing"` (one phrase) give
+  different results.
+- Filter state is reflected in the URL, so a filtered view is shareable:
   `?days=7&topics=qec,qml&mode=all`.
 
-## Uso in locale
+## Running it locally
 
 ```bash
-python3 scraper/fetch_arxiv.py --days 35   # genera docs/data/papers.json
+python3 scraper/fetch_arxiv.py --days 35   # writes docs/data/papers.json
 python3 -m http.server 8000 --directory docs
-# apri http://localhost:8000
+# open http://localhost:8000
 ```
 
-Serve un server HTTP: aprendo `docs/index.html` come `file://` il browser
-blocca il `fetch` dei dati.
+An HTTP server is required: opening `docs/index.html` as a `file://` URL makes
+the browser block the data `fetch`.
 
-## Deploy su GitHub Pages
+## Deploying to GitHub Pages
 
-Il workflow [`update-and-deploy.yml`](.github/workflows/update-and-deploy.yml)
-rigenera i dati e ridistribuisce il sito ogni giorno alle 07:00 UTC (e a ogni
-push su `main`).
+[`update-and-deploy.yml`](.github/workflows/update-and-deploy.yml) regenerates
+the data and redeploys the site daily at 07:00 UTC, and on every push to `main`.
 
-Va abilitato una volta sola: **Settings → Pages → Source: GitHub Actions**.
+It needs to be enabled once: **Settings → Pages → Source: GitHub Actions**.
 
-> `docs/data/papers.json` è in `.gitignore` di proposito. Viene generato in CI a
-> ogni deploy: committarlo significherebbe aggiungere ~4 MB alla history del
-> repo ogni giorno.
+> `docs/data/papers.json` is in `.gitignore` on purpose. It is generated in CI on
+> every deploy; committing it would add ~4 MB to the repository history every
+> single day.
 
-## Personalizzare gli argomenti
+## Customising the topics
 
-Tutto sta in `docs/data/topics.json`:
+Everything lives in `docs/data/topics.json`:
 
 ```json
 {
@@ -77,19 +78,21 @@ Tutto sta in `docs/data/topics.json`:
 }
 ```
 
-Il sito legge questo file a ogni caricamento, quindi per aggiungere o correggere
-un topic **non serve rilanciare lo scraper**: modifica, ricarica, fatto.
+The site reads this file on every page load, so adding or fixing a topic
+**does not require re-running the scraper**: edit, reload, done.
 
-Due accortezze:
+A few caveats:
 
-- evita acronimi troppo corti o ambigui (`QEC` va bene, `QC` genera falsi
-  positivi a raffica);
-- le keyword sono cercate su titolo + abstract, non sulle categorie arXiv.
+- avoid short or ambiguous acronyms (`QEC` is fine, `QC` produces a flood of
+  false positives);
+- keywords are matched against title + abstract, not against arXiv categories;
+- `id` values appear in shared URLs, so renaming one breaks existing links —
+  change the `label` freely, but keep the `id`.
 
-Sull'ultima settimana di dati questa tassonomia classifica circa il 93% dei
-paper; il resto sono tipicamente cross-list di matematica o hep-th.
+On the most recent week of data this taxonomy classifies about 93% of papers;
+the remainder are typically maths or hep-th cross-lists.
 
 ---
 
-Dati forniti dall'API di arXiv. Grazie ad arXiv per l'uso della sua
-interoperabilità open access.
+Data provided by the arXiv API. Thank you to arXiv for use of its open access
+interoperability.
