@@ -1,0 +1,46 @@
+name: Update data and deploy site
+
+on:
+  schedule:
+    # 07:00 UTC: arXiv announces the day's quant-ph batch at 01:00 UTC (20:00 ET),
+    # so by morning in Europe the data is already fresh.
+    - cron: "0 7 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue them instead of cancelling a live one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The scraper is stdlib-only, so there is nothing to install.
+      - name: Fetch the last 35 days of quant-ph
+        run: python scraper/fetch_arxiv.py --days 35 --out docs/data/papers.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
