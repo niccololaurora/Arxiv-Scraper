@@ -61,21 +61,9 @@ a { color: var(--accent); }
 .logo { color: var(--accent); margin-right: 0.3rem; }
 
 .topbar h1 {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0 0.55rem;
   font-size: 1.05rem;
   margin: 0;
   letter-spacing: -0.01em;
-}
-/* Subtitle sits on the same line as the title, separated by a thin rule. */
-.tagline {
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: var(--muted);
-  padding-left: 0.55rem;
-  border-left: 1px solid var(--border);
 }
 .topbar-right { display: flex; align-items: center; gap: 0.9rem; }
 .freshness { font-size: 0.75rem; color: var(--muted); text-align: right; }
@@ -424,7 +412,4 @@ footer .credit { font-size: 0.8rem; color: var(--text); margin-bottom: 0.35rem; 
   /* The group credit is repeated in the footer, so the narrow top bar can
      drop it rather than wrap. */
   .group-link { display: none; }
-  /* Once the subtitle wraps onto its own line the separator rule would hang
-     off its left edge, so drop it. */
-  .tagline { border-left: none; padding-left: 0; }
 }
