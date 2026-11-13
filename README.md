@@ -1,7 +1,12 @@
 # quant-ph topic scanner
 
 A web interface to see which `quant-ph` papers appeared on arXiv **in the last
-day, week or month**, filtered by topic.
+day, week or month**, filtered by topics **you define yourself**.
+
+There is no built-in taxonomy: a topic is a name and a handful of keywords, you
+write them, and they live in your browser. Two people reading the same feed
+end up with two different sidebars, which is the point — nobody has to agree on
+how to carve up quant-ph.
 
 A Python scraper runs daily on GitHub Actions, pulls recent submissions from the
 [arXiv API](https://info.arxiv.org/help/api/index.html) and publishes a static
@@ -23,13 +28,11 @@ scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
 - **`scraper/fetch_arxiv.py`** — pages through the arXiv API over a
   `submittedDate` window, deduplicates, and writes a compact JSON. Standard
   library only, and it honours the 3 s delay arXiv asks for between calls.
-- **`docs/data/topics.json`** — the topic taxonomy: 22 topics in 5 groups, each
-  with its own keywords. **It is meant to be edited by hand** (see below).
 - **`docs/data/members.json`** — the group roster, hand-edited. The scraper
   queries arXiv for these authors and writes `group.json`, which feeds the
   "From the group" panel on the right.
-- **`docs/app.js`** — computes each paper's topics once at load time, after
-  which every filter is a set lookup.
+- **`docs/app.js`** — reads your topics from `localStorage`, matches each paper
+  against them once at load time, after which every filter is a set lookup.
 
 ### The group panel
 
@@ -56,7 +59,9 @@ Details worth knowing:
   `spin squeezing` (two terms) and `"spin squeezing"` (one phrase) give
   different results.
 - Filter state is reflected in the URL, so a filtered view is shareable:
-  `?days=7&topics=qec,qml&mode=all`.
+  `?days=7&topics=gaussian-states,error-correction&mode=all`. Topic ids are
+  derived from the name, so a link only resolves for someone whose own topics
+  carry the same names — send them your exported JSON and it will.
 
 ## Running it locally
 
@@ -80,35 +85,42 @@ It needs to be enabled once: **Settings → Pages → Source: GitHub Actions**.
 > every deploy; committing it would add ~4 MB to the repository history every
 > single day.
 
-## Customising the topics
+## Making your own topics
 
-Everything lives in `docs/data/topics.json`:
+**+ New topic** in the sidebar asks for a name and a comma-separated list of
+keywords, and tells you how many papers they match **while you type** — which
+is the only reliable way to find out that `QC` hits half the archive before you
+save it.
+
+A few things worth knowing:
+
+- keywords are matched against title + abstract, never against arXiv
+  categories, so `superconducting qubit` finds papers, `cond-mat.supr-con`
+  does not;
+- prefer the specific phrase over the generic word (`variational Monte Carlo`,
+  not `Monte Carlo`) and acronyms long enough to be unambiguous (`QEC` is fine,
+  `QC` is not);
+- the same accommodations as the search box apply: singular/plural
+  (`surface code` also finds `surface codes`) and hyphens equal spaces
+  (`non-Markovian` = `non Markovian`).
+
+Topics live in `localStorage`, so they are per-browser and survive reloads but
+not a new laptop. **export** downloads them as JSON and **import** reads them
+back, which is also how you hand a working set of topics to a colleague:
 
 ```json
-{
-  "id": "qec",
-  "label": "Quantum error correction",
-  "keywords": ["quantum error correction", "QEC", "surface code", "decoder"]
-}
+[
+  {
+    "id": "gaussian-states",
+    "label": "Gaussian states",
+    "keywords": ["Gaussian state", "covariance matrix", "squeezed vacuum"]
+  }
+]
 ```
 
-The site reads this file on every page load, so adding or fixing a topic
-**does not require re-running the scraper**: edit, reload, done.
-
-A few caveats:
-
-- avoid short or ambiguous acronyms (`QEC` is fine, `QC` produces a flood of
-  false positives);
-- keywords are matched against title + abstract, not against arXiv categories;
-- `id` values appear in shared URLs, so renaming one breaks existing links —
-  change the `label` freely, but keep the `id`.
-
-The taxonomy is deliberately focused on the group's own areas rather than on
-covering all of quant-ph, so on the most recent week of data it tags about 79%
-of papers. What falls through is mostly maths and nuclear cross-lists, plus the
-subfields intentionally left out (QKD, quantum networks, complexity,
-condensed-matter many-body, lattice QFT, control, benchmarking, compilation).
-Adding any of them back is a matter of appending one entry to this file.
+`id` is optional on import — it is derived from the name when missing — and
+importing a name you already have is skipped rather than duplicated, so
+re-importing the same file twice is harmless.
 
 ---
 

@@ -193,18 +193,6 @@ input[type="search"]:focus, select:focus {
 
 /* ---------- topic list ---------- */
 
-.group { border-top: 1px solid var(--border); padding: 0.4rem 0; }
-.group:first-of-type { border-top: none; }
-
-.group summary {
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.25rem 0;
-  color: var(--text);
-}
-.group summary::marker { color: var(--muted); }
-
 .topic-row { display: flex; align-items: center; border-radius: 5px; }
 .topic-row:hover { background: var(--surface-2); }
 
@@ -222,24 +210,80 @@ input[type="search"]:focus, select:focus {
 .topic-label { flex: 1; }
 .topic input { accent-color: var(--accent); margin: 0; }
 
-/* Dimmed rather than hidden until hover, so the star is also reachable on a
-   touch screen, where there is no hover to reveal it. */
-.fav {
+/* Dimmed rather than hidden until hover, so the buttons stay reachable on a
+   touch screen, where there is no hover to reveal them. */
+.row-action {
   background: none;
   border: none;
   color: var(--muted);
   opacity: 0.35;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   line-height: 1;
-  padding: 0.25rem 0.3rem;
+  padding: 0.25rem 0.25rem;
 }
-.topic-row:hover .fav { opacity: 1; }
-.fav:hover { color: var(--accent); }
-.fav.on { color: var(--accent); opacity: 1; }
+.topic-row:hover .row-action { opacity: 1; }
+.row-action:hover { color: var(--accent); }
+.row-action.delete { font-size: 1rem; }
 
-.favourites summary { color: var(--accent); }
-.fav-hint { margin: 0 0 0.5rem; }
+.empty-topics { margin: 0.2rem 0 0.6rem; }
+
+/* ---------- topic form ---------- */
+
+.topic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.topic-form input, .topic-form textarea {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+.topic-form input:focus, .topic-form textarea:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+.topic-form .sample { font-style: italic; }
+
+.form-actions { display: flex; gap: 0.4rem; }
+.form-actions button {
+  flex: 1;
+  padding: 0.35rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.form-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+.form-actions button:hover { border-color: var(--accent); }
+
+.panel-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.6rem;
+}
+.panel-foot .link-button { margin-bottom: 0; }
+.foot-right { display: flex; gap: 0.6rem; }
+#topics-status:empty { display: none; }
 
 .count {
   font-size: 0.7rem;

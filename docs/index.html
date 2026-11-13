@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>quant-ph topic scanner</title>
-<meta name="description" content="Browse by topic the quant-ph papers posted to arXiv in the last day, week or month.">
+<meta name="description" content="Browse the quant-ph papers posted to arXiv in the last day, week or month, filtered by topics you define yourself.">
 <!-- ?v= is rewritten to the commit sha at deploy time: without it a browser can
      pair a cached app.js with a fresh index.html and break on a renamed id. -->
 <link rel="stylesheet" href="style.css?v=dev">
@@ -43,7 +43,7 @@
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Topics</h2>
+        <h2>My topics</h2>
         <button id="clear-topics" class="link-button">clear</button>
       </div>
       <div class="segmented small" id="match-mode" role="group" aria-label="How to combine topics">
@@ -51,6 +51,27 @@
         <button data-mode="all">All of them</button>
       </div>
       <div id="topics"></div>
+
+      <form id="topic-form" class="topic-form" hidden>
+        <input id="topic-label" type="text" placeholder="Name, e.g. Gaussian states" autocomplete="off" required>
+        <textarea id="topic-keywords" rows="3"
+          placeholder="Keywords, comma separated&#10;Gaussian state, covariance matrix, squeezed vacuum"></textarea>
+        <p class="hint" id="topic-preview"></p>
+        <div class="form-actions">
+          <button type="submit" class="primary">Save</button>
+          <button type="button" id="topic-cancel">Cancel</button>
+        </div>
+      </form>
+
+      <div class="panel-foot">
+        <button id="topic-new" class="link-button">+ New topic</button>
+        <span class="foot-right">
+          <button id="topics-export" class="link-button" title="Download your topics as JSON">export</button>
+          <button id="topics-import" class="link-button" title="Load topics from a JSON file">import</button>
+        </span>
+      </div>
+      <p class="hint" id="topics-status" role="status"></p>
+      <input type="file" id="topics-file" accept="application/json,.json" hidden>
     </section>
   </aside>
 

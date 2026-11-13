@@ -1,17 +1,16 @@
 /* quant-ph topic scanner — static client, no build step, no dependencies. */
 
 const PAGE_SIZE = 25;
-const FAVOURITES_KEY = "favourite-topics";
+const TOPICS_KEY = "my-topics";
 
 const state = {
   papers: [],
-  groups: [],
-  topics: new Map(),      // id -> {id, label, regex, group}
+  topics: new Map(),      // id -> {id, label, keywords, regex} — all of them the reader's own
   matches: new Map(),     // paper id -> Set of topic ids
   newest: null,           // most recent submission in the dataset
   days: 1,
   selected: new Set(),
-  favourites: new Set(),  // pinned to the top of the sidebar, kept in localStorage
+  editing: null,          // topic id the form is editing, null when it creates a new one
   mode: "any",
   query: "",
   page: 1,
@@ -35,17 +34,14 @@ function keywordSource(keyword) {
   return prefix + body + suffix;
 }
 
-function buildTopics(groups) {
-  for (const group of groups) {
-    for (const topic of group.topics) {
-      state.topics.set(topic.id, {
-        ...topic,
-        group: group.name,
-        regex: new RegExp(topic.keywords.map(keywordSource).join("|"), "g"),
-      });
-    }
-  }
-}
+const buildTopic = ({ id, label, keywords }) => ({
+  id, label, keywords,
+  regex: new RegExp(keywords.map(keywordSource).join("|"), "g"),
+});
+
+/** Keywords come from a textarea: comma or newline separated, in any spacing. */
+const parseKeywords = (raw) =>
+  raw.split(/[,\n]/).map((keyword) => keyword.trim()).filter(Boolean);
 
 /** Precompute topic hits once; filtering afterwards is a set lookup. */
 function indexPapers() {
@@ -157,46 +153,74 @@ function formatAuthors(authors) {
   return `${authors.slice(0, 5).join(", ")} + ${authors.length - 5} more`;
 }
 
-/** The star sits next to the label, not inside it: a click anywhere within a
- *  <label> would otherwise toggle the checkbox as well. */
+/** The edit and delete buttons sit next to the label, not inside it: a click
+ *  anywhere within a <label> would otherwise toggle the checkbox as well. */
 function renderTopic(topic, counts) {
   const count = counts.get(topic.id) || 0;
   const checked = state.selected.has(topic.id) ? "checked" : "";
-  const starred = state.favourites.has(topic.id);
   return `<div class="topic-row">
     <label class="topic ${count ? "" : "empty"}">
       <input type="checkbox" value="${topic.id}" ${checked}>
       <span class="topic-label">${escapeHtml(topic.label)}</span>
       <span class="count">${count}</span>
     </label>
-    <button class="fav ${starred ? "on" : ""}" data-topic="${topic.id}"
-      aria-pressed="${starred}"
-      title="${starred ? "Remove from favourites" : "Add to favourites"}"
-    >${starred ? "★" : "☆"}</button>
+    <button class="row-action edit" data-topic="${topic.id}" title="Edit this topic">✎</button>
+    <button class="row-action delete" data-topic="${topic.id}" title="Delete this topic">×</button>
   </div>`;
 }
 
 function renderTopics() {
   const counts = topicCounts();
+  const topics = [...state.topics.values()];
 
-  // A favourite is a shortcut, not a move: the topic keeps its place in its own
-  // group, and the two checkboxes are two views of the same filter. Order
-  // follows the taxonomy so pinned topics never shuffle around.
-  const starred = [...state.topics.values()].filter((topic) => state.favourites.has(topic.id));
-  const pinned = starred.length
-    ? `<details open class="group favourites">
-        <summary>★ Favourites</summary>${starred.map((topic) => renderTopic(topic, counts)).join("")}
-      </details>`
-    : `<p class="hint fav-hint">Click ☆ next to a topic to pin it here.</p>`;
+  el("topics").innerHTML = topics.length
+    ? topics.map((topic) => renderTopic(topic, counts)).join("")
+    : `<p class="hint empty-topics">
+        No topics yet. A topic is a name and a few keywords, matched against
+        titles and abstracts — make one for whatever you actually read.
+      </p>`;
 
-  el("topics").innerHTML = pinned + state.groups
-    .map((group) => {
-      const items = group.topics.map((topic) => renderTopic(topic, counts)).join("");
-      return `<details open class="group">
-        <summary>${escapeHtml(group.name)}</summary>${items}
-      </details>`;
-    })
-    .join("");
+  // Combining one topic with itself means nothing; the control only earns its
+  // space once there are two.
+  el("match-mode").hidden = topics.length < 2;
+}
+
+/* ---------- the topic form ---------- */
+
+/** Counting as you type is the whole point of the form: it is the only way to
+ *  find out that "QC" matches half the archive before saving it. */
+function previewTopic() {
+  const keywords = parseKeywords(el("topic-keywords").value);
+  if (!keywords.length) {
+    el("topic-preview").textContent = "Add at least one keyword, separated by commas.";
+    return;
+  }
+  const regex = new RegExp(keywords.map(keywordSource).join("|"), "i");
+  const since = cutoff();
+  const inWindow = state.papers.filter((paper) => new Date(paper.published) >= since);
+  const hits = inWindow.filter((paper) => regex.test(`${paper.title} ${paper.abstract}`));
+  const sample = hits.slice(0, 2).map((paper) => paper.title).join(" · ");
+  el("topic-preview").innerHTML =
+    `Matches <strong>${hits.length}</strong> of the ${inWindow.length} papers in this time window.` +
+    (sample ? `<br><span class="sample">${escapeHtml(sample)}</span>` : "");
+}
+
+function openForm(id) {
+  state.editing = id || null;
+  const topic = id ? state.topics.get(id) : null;
+  el("topic-label").value = topic ? topic.label : "";
+  el("topic-keywords").value = topic ? topic.keywords.join(", ") : "";
+  el("topic-form").hidden = false;
+  el("topic-new").hidden = true;
+  previewTopic();
+  el("topic-label").focus();
+}
+
+function closeForm() {
+  state.editing = null;
+  el("topic-form").hidden = true;
+  el("topic-new").hidden = false;
+  el("topics-status").textContent = "";
 }
 
 function renderActiveFilters() {
@@ -300,25 +324,94 @@ function render() {
   syncUrl();
 }
 
-/* ---------- favourites: a per-browser preference, not part of the URL ---------- */
+/* ---------- the reader's own topics, kept in localStorage ---------- */
 
-function loadFavourites() {
+const isTopic = (value) =>
+  value && typeof value.label === "string" && Array.isArray(value.keywords) &&
+  value.keywords.every((keyword) => typeof keyword === "string");
+
+/** Ids end up in shared URLs, so they are derived from the label rather than
+ *  from a counter: a link keeps working after a reload, and two people who
+ *  both made a "Gaussian states" topic can read each other's links. */
+function topicId(label) {
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "topic";
+  let id = base;
+  for (let n = 2; state.topics.has(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+function loadTopics() {
+  let stored = [];
   try {
-    const stored = JSON.parse(localStorage.getItem(FAVOURITES_KEY) || "[]");
-    // Ids disappear when the taxonomy is edited; drop the stale ones rather
-    // than pin a topic the page can no longer render.
-    for (const id of stored) if (state.topics.has(id)) state.favourites.add(id);
+    stored = JSON.parse(localStorage.getItem(TOPICS_KEY) || "[]");
   } catch (error) {
-    console.warn("could not read favourites:", error);
+    console.warn("could not read your topics:", error);
+  }
+  if (!Array.isArray(stored)) return;
+  for (const topic of stored.filter(isTopic)) {
+    const id = typeof topic.id === "string" && topic.id ? topic.id : topicId(topic.label);
+    state.topics.set(id, buildTopic({ ...topic, id }));
   }
 }
 
-function saveFavourites() {
+function saveTopics() {
   try {
-    localStorage.setItem(FAVOURITES_KEY, JSON.stringify([...state.favourites]));
+    const plain = [...state.topics.values()].map(({ id, label, keywords }) => ({ id, label, keywords }));
+    localStorage.setItem(TOPICS_KEY, JSON.stringify(plain));
   } catch (error) {
-    console.warn("could not save favourites:", error);
+    console.warn("could not save your topics:", error);
   }
+}
+
+/* ---------- export / import, so a topic list can outlive one browser ---------- */
+
+function exportTopics() {
+  const plain = [...state.topics.values()].map(({ id, label, keywords }) => ({ id, label, keywords }));
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(plain, null, 2)], { type: "application/json" })
+  );
+  // In the document and revoked a tick later: Firefox ignores a click on a
+  // detached anchor, and revoking in the same tick can cancel the download.
+  const link = document.body.appendChild(document.createElement("a"));
+  link.href = url;
+  link.download = "my-topics.json";
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function importTopics(file) {
+  let incoming;
+  try {
+    incoming = JSON.parse(await file.text());
+  } catch (error) {
+    el("topics-status").textContent = "That file is not valid JSON.";
+    return;
+  }
+  const valid = Array.isArray(incoming) ? incoming.filter(isTopic) : [];
+  if (!valid.length) {
+    el("topics-status").textContent = "No topics in that file — expected a list of {label, keywords}.";
+    return;
+  }
+
+  // Importing the same file twice should be a no-op, so a label already in the
+  // list is skipped rather than duplicated under "gaussian-states-2".
+  const taken = new Set([...state.topics.values()].map((topic) => topic.label.toLowerCase()));
+  let added = 0;
+  for (const topic of valid) {
+    if (taken.has(topic.label.toLowerCase())) continue;
+    taken.add(topic.label.toLowerCase());
+    const id = topicId(topic.label);
+    state.topics.set(id, buildTopic({ id, label: topic.label, keywords: topic.keywords }));
+    added++;
+  }
+
+  saveTopics();
+  indexPapers();
+  render();
+  const skipped = valid.length - added;
+  el("topics-status").textContent =
+    `Imported ${added} topic${added === 1 ? "" : "s"}` + (skipped ? `, ${skipped} already here.` : ".");
 }
 
 /* ---------- URL state, so a filtered view can be shared ---------- */
@@ -393,12 +486,55 @@ function wireEvents() {
   });
 
   el("topics").addEventListener("click", (event) => {
-    const star = event.target.closest(".fav");
-    if (!star) return;
-    const id = star.dataset.topic;
-    state.favourites.has(id) ? state.favourites.delete(id) : state.favourites.add(id);
-    saveFavourites();
-    renderTopics();   // pinning changes the sidebar only, never the results
+    const action = event.target.closest(".row-action");
+    if (!action) return;
+    const id = action.dataset.topic;
+    const topic = state.topics.get(id);
+    if (action.classList.contains("edit")) return openForm(id);
+
+    // A topic is a minute of typing to get right, and the button sits a few
+    // pixels from the checkbox, so deleting one asks first.
+    if (!confirm(`Delete the topic “${topic.label}”?`)) return;
+    state.topics.delete(id);
+    state.selected.delete(id);
+    for (const hits of state.matches.values()) hits.delete(id);
+    if (state.editing === id) closeForm();
+    saveTopics();
+    state.page = 1;
+    render();
+  });
+
+  el("topic-new").addEventListener("click", () => openForm(null));
+  el("topic-cancel").addEventListener("click", closeForm);
+  el("topic-keywords").addEventListener("input", debounce(previewTopic, 200));
+
+  el("topic-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const label = el("topic-label").value.trim();
+    const keywords = parseKeywords(el("topic-keywords").value);
+    if (!label || !keywords.length) return;
+
+    // Map.set on an existing key keeps its position, so editing a topic does
+    // not send it to the bottom of the list.
+    const id = state.editing || topicId(label);
+    state.topics.set(id, buildTopic({ id, label, keywords }));
+    // A topic you just defined is one you want to see: select it, so saving
+    // shows the papers instead of just a new line in the sidebar.
+    if (!state.editing) state.selected.add(id);
+
+    saveTopics();
+    indexPapers();
+    closeForm();
+    state.page = 1;
+    render();
+  });
+
+  el("topics-export").addEventListener("click", exportTopics);
+  el("topics-import").addEventListener("click", () => el("topics-file").click());
+  el("topics-file").addEventListener("change", (event) => {
+    const [file] = event.target.files;
+    if (file) importTopics(file);
+    event.target.value = "";   // so picking the same file twice fires again
   });
 
   el("active-filters").addEventListener("click", (event) => {
@@ -449,15 +585,11 @@ async function main() {
     localStorage.getItem("theme") ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 
-  let payload, taxonomy;
+  let payload;
   try {
-    const [papersResponse, topicsResponse] = await Promise.all([
-      fetch("data/papers.json"),
-      fetch("data/topics.json"),
-    ]);
-    if (!papersResponse.ok || !topicsResponse.ok) throw new Error("fetch failed");
+    const papersResponse = await fetch("data/papers.json");
+    if (!papersResponse.ok) throw new Error("fetch failed");
     payload = await papersResponse.json();
-    taxonomy = await topicsResponse.json();
   } catch (error) {
     return showFailure("Could not load the data",
       `Unable to read <code>data/papers.json</code>.<br>
@@ -470,10 +602,9 @@ async function main() {
   // wrong place — as it did when a cached app.js met a newer index.html.
   try {
     state.papers = payload.papers;
-    state.groups = taxonomy.groups;
     state.newest = new Date(payload.papers[0].published);
 
-    buildTopics(state.groups);
+    loadTopics();
     indexPapers();
 
     const generated = new Date(payload.generated_at);
@@ -482,7 +613,6 @@ async function main() {
     el("window-hint").textContent =
       `Measured from the latest submission (${formatDate(payload.papers[0].published)}), not from the current time.`;
 
-    loadFavourites();
     restoreFromUrl();
     wireEvents();
     render();
