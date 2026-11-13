@@ -1,6 +1,7 @@
 /* quant-ph topic scanner — static client, no build step, no dependencies. */
 
 const PAGE_SIZE = 25;
+const FAVOURITES_KEY = "favourite-topics";
 
 const state = {
   papers: [],
@@ -10,6 +11,7 @@ const state = {
   newest: null,           // most recent submission in the dataset
   days: 1,
   selected: new Set(),
+  favourites: new Set(),  // pinned to the top of the sidebar, kept in localStorage
   mode: "any",
   query: "",
   page: 1,
@@ -155,21 +157,41 @@ function formatAuthors(authors) {
   return `${authors.slice(0, 5).join(", ")} + ${authors.length - 5} more`;
 }
 
+/** The star sits next to the label, not inside it: a click anywhere within a
+ *  <label> would otherwise toggle the checkbox as well. */
+function renderTopic(topic, counts) {
+  const count = counts.get(topic.id) || 0;
+  const checked = state.selected.has(topic.id) ? "checked" : "";
+  const starred = state.favourites.has(topic.id);
+  return `<div class="topic-row">
+    <label class="topic ${count ? "" : "empty"}">
+      <input type="checkbox" value="${topic.id}" ${checked}>
+      <span class="topic-label">${escapeHtml(topic.label)}</span>
+      <span class="count">${count}</span>
+    </label>
+    <button class="fav ${starred ? "on" : ""}" data-topic="${topic.id}"
+      aria-pressed="${starred}"
+      title="${starred ? "Remove from favourites" : "Add to favourites"}"
+    >${starred ? "★" : "☆"}</button>
+  </div>`;
+}
+
 function renderTopics() {
   const counts = topicCounts();
-  el("topics").innerHTML = state.groups
+
+  // A favourite is a shortcut, not a move: the topic keeps its place in its own
+  // group, and the two checkboxes are two views of the same filter. Order
+  // follows the taxonomy so pinned topics never shuffle around.
+  const starred = [...state.topics.values()].filter((topic) => state.favourites.has(topic.id));
+  const pinned = starred.length
+    ? `<details open class="group favourites">
+        <summary>★ Favourites</summary>${starred.map((topic) => renderTopic(topic, counts)).join("")}
+      </details>`
+    : `<p class="hint fav-hint">Click ☆ next to a topic to pin it here.</p>`;
+
+  el("topics").innerHTML = pinned + state.groups
     .map((group) => {
-      const items = group.topics
-        .map((topic) => {
-          const count = counts.get(topic.id) || 0;
-          const checked = state.selected.has(topic.id) ? "checked" : "";
-          return `<label class="topic ${count ? "" : "empty"}">
-            <input type="checkbox" value="${topic.id}" ${checked}>
-            <span class="topic-label">${escapeHtml(topic.label)}</span>
-            <span class="count">${count}</span>
-          </label>`;
-        })
-        .join("");
+      const items = group.topics.map((topic) => renderTopic(topic, counts)).join("");
       return `<details open class="group">
         <summary>${escapeHtml(group.name)}</summary>${items}
       </details>`;
@@ -278,6 +300,27 @@ function render() {
   syncUrl();
 }
 
+/* ---------- favourites: a per-browser preference, not part of the URL ---------- */
+
+function loadFavourites() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FAVOURITES_KEY) || "[]");
+    // Ids disappear when the taxonomy is edited; drop the stale ones rather
+    // than pin a topic the page can no longer render.
+    for (const id of stored) if (state.topics.has(id)) state.favourites.add(id);
+  } catch (error) {
+    console.warn("could not read favourites:", error);
+  }
+}
+
+function saveFavourites() {
+  try {
+    localStorage.setItem(FAVOURITES_KEY, JSON.stringify([...state.favourites]));
+  } catch (error) {
+    console.warn("could not save favourites:", error);
+  }
+}
+
 /* ---------- URL state, so a filtered view can be shared ---------- */
 
 function syncUrl() {
@@ -347,6 +390,15 @@ function wireEvents() {
     box.checked ? state.selected.add(box.value) : state.selected.delete(box.value);
     state.page = 1;
     render();
+  });
+
+  el("topics").addEventListener("click", (event) => {
+    const star = event.target.closest(".fav");
+    if (!star) return;
+    const id = star.dataset.topic;
+    state.favourites.has(id) ? state.favourites.delete(id) : state.favourites.add(id);
+    saveFavourites();
+    renderTopics();   // pinning changes the sidebar only, never the results
   });
 
   el("active-filters").addEventListener("click", (event) => {
@@ -430,6 +482,7 @@ async function main() {
     el("window-hint").textContent =
       `Measured from the latest submission (${formatDate(payload.papers[0].published)}), not from the current time.`;
 
+    loadFavourites();
     restoreFromUrl();
     wireEvents();
     render();
