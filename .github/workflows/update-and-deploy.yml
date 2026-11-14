@@ -40,7 +40,7 @@ jobs:
       # a browser can pair a cached app.js with a fresh index.html. Stamping the
       # commit sha onto the asset URLs makes each deploy fetch its own pair.
       - name: Stamp asset versions with the commit sha
-        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" docs/index.html
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" docs/*.html
 
       # upload-pages-artifact and deploy-pages must stay on matching majors:
       # an older uploader writes artifact metadata the newer deployer cannot
