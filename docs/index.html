@@ -37,7 +37,7 @@
 
     <section class="panel">
       <h2>Search</h2>
-      <input type="search" id="query" placeholder="e.g. bosonic code, Tomamichel, &quot;spin squeezing&quot;" autocomplete="off">
+      <input type="search" id="query" placeholder="Search" autocomplete="off">
       <p class="hint">Searches titles, abstracts and <strong>author names</strong>. Every term must appear; quotes keep a phrase together.</p>
     </section>
 
@@ -53,9 +53,9 @@
       <div id="topics"></div>
 
       <form id="topic-form" class="topic-form" hidden>
-        <input id="topic-label" type="text" placeholder="Name, e.g. Gaussian states" autocomplete="off" required>
+        <input id="topic-label" type="text" placeholder="Name" autocomplete="off" required>
         <textarea id="topic-keywords" rows="3"
-          placeholder="Keywords, comma separated&#10;Gaussian state, covariance matrix, squeezed vacuum"></textarea>
+          placeholder="Keywords, comma separated"></textarea>
         <p class="hint" id="topic-preview"></p>
         <div class="form-actions">
           <button type="submit" class="primary">Save</button>
@@ -100,7 +100,7 @@
         <h2>Authors I follow</h2>
       </div>
       <form id="author-form">
-        <input id="author-name" type="text" placeholder="e.g. Matteo Paris" autocomplete="off" required>
+        <input id="author-name" type="text" placeholder="Name" autocomplete="off" required>
         <button type="submit" class="primary">Follow</button>
       </form>
       <p class="hint" id="author-hint"></p>

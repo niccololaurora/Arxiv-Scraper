@@ -439,14 +439,6 @@ function saveAuthors() {
  *  redrawn when the list itself changes — scanning every author of every paper
  *  is too much work to repeat on each keystroke in the search box. */
 function renderAuthors() {
-  if (!state.authors.length) {
-    el("followed").innerHTML = `<p class="hint">
-      Nobody yet. Add a name and their submissions show up here — and keep
-      showing up on their own as the data is refreshed every morning.
-    </p>`;
-    return;
-  }
-
   el("followed").innerHTML = state.authors
     .map((name) => {
       const papers = papersBy(name);
