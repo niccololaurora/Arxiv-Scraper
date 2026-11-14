@@ -23,6 +23,18 @@
   --mark: #5c4a16;
 }
 
+/* Research runs the same stylesheet in violet, so you can tell at a glance
+   which of the two pages you are on. Overriding the two accent variables is
+   the whole theme: everything else already reads them. */
+.research-page {
+  --accent: #5b3a8e;
+  --accent-soft: #ece3f7;
+}
+:root[data-theme="dark"] .research-page {
+  --accent: #b48ae6;
+  --accent-soft: #2b2239;
+}
+
 * { box-sizing: border-box; }
 
 /* The browser hides [hidden] with `display: none`, but any author rule that

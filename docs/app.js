@@ -830,8 +830,6 @@ async function main() {
     watchSentinel();
     render();
     renderAuthors();
-    el("author-hint").textContent =
-      `Searched in the last ${state.windowDays} days of quant-ph, so work posted to another archive only shows up if it is cross-listed here.`;
   } catch (error) {
     return showFailure("Something went wrong displaying the data",
       `The data loaded, but the page failed to render it.<br>
