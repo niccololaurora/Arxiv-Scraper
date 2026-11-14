@@ -1,7 +1,23 @@
 /* quant-ph topic scanner — static client, no build step, no dependencies. */
 
-const PAGE_SIZE = 25;
+const PAGE = 25;              // papers added per scroll
 const TOPICS_KEY = "my-topics";
+const AUTHORS_KEY = "followed-authors";
+
+/** arXiv announces a day's quant-ph in three lists, and these reproduce them as
+ *  a partition of the data — every paper lands in exactly one.
+ *  "Replacement" is narrower here than on arXiv: the API's date filters only
+ *  ever match the v1 submission date, so a paper submitted last year and
+ *  revised today is not in the dataset at all. What we can see is a paper
+ *  submitted inside the window that has since gained a version. */
+const KINDS = [
+  { id: "new", label: "New", title: "First version, submitted to quant-ph" },
+  { id: "cross", label: "Cross-lists", title: "Submitted to another archive, cross-listed to quant-ph" },
+  { id: "replace", label: "Replacements", title: "Revised since it was first submitted (v2 or later)" },
+];
+
+const paperKind = (paper) =>
+  paper.version > 1 ? "replace" : paper.primary_category === "quant-ph" ? "new" : "cross";
 
 const state = {
   papers: [],
@@ -10,10 +26,14 @@ const state = {
   newest: null,           // most recent submission in the dataset
   days: 1,
   selected: new Set(),
+  kinds: new Set(KINDS.map((kind) => kind.id)),
   editing: null,          // topic id the form is editing, null when it creates a new one
   mode: "any",
   query: "",
-  page: 1,
+  shown: PAGE,            // how far down the infinite scroll has got
+  authors: [],            // names the reader follows, as typed
+  groupPapers: [],        // the group's own recent submissions, for the right-hand panel
+  windowDays: 0,          // how far back the dataset itself goes
 };
 
 const el = (id) => document.getElementById(id);
@@ -101,6 +121,7 @@ function currentResults() {
 
   return state.papers.filter((paper) => {
     if (new Date(paper.published) < since) return false;
+    if (!state.kinds.has(paperKind(paper))) return false;
     if (!matchesQuery(paper, terms)) return false;
     if (!selected.length) return true;
     const hits = state.matches.get(paper.id);
@@ -117,10 +138,35 @@ function topicCounts() {
   const counts = new Map();
   for (const paper of state.papers) {
     if (new Date(paper.published) < since) continue;
+    if (!state.kinds.has(paperKind(paper))) continue;
     if (!matchesQuery(paper, terms)) continue;
     for (const id of state.matches.get(paper.id)) {
       counts.set(id, (counts.get(id) || 0) + 1);
     }
+  }
+  return counts;
+}
+
+/** Per-kind counts, ignoring which kinds are switched on: a button has to be
+ *  able to say what it would bring back. */
+function kindCounts() {
+  const since = cutoff();
+  const terms = parseQuery(state.query);
+  const selected = [...state.selected];
+  const counts = new Map();
+
+  for (const paper of state.papers) {
+    if (new Date(paper.published) < since) continue;
+    if (!matchesQuery(paper, terms)) continue;
+    if (selected.length) {
+      const hits = state.matches.get(paper.id);
+      const keep = state.mode === "all"
+        ? selected.every((id) => hits.has(id))
+        : selected.some((id) => hits.has(id));
+      if (!keep) continue;
+    }
+    const kind = paperKind(paper);
+    counts.set(kind, (counts.get(kind) || 0) + 1);
   }
   return counts;
 }
@@ -233,22 +279,34 @@ function renderActiveFilters() {
     : "";
 }
 
+function renderKinds() {
+  const counts = kindCounts();
+  el("kind-filter").innerHTML = KINDS
+    .map((kind) => {
+      const on = state.kinds.has(kind.id);
+      return `<button class="kind ${on ? "on" : ""}" data-kind="${kind.id}"
+        aria-pressed="${on}" title="${kind.title}"
+      >${kind.label} <span class="count">${counts.get(kind.id) || 0}</span></button>`;
+    })
+    .join("");
+}
+
 function renderPapers(results) {
   const terms = parseQuery(state.query);
-  const pages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
-  state.page = Math.min(state.page, pages);
-  const slice = results.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
-
   if (!results.length) {
     el("papers").innerHTML = `<p class="empty-state">
       No paper matches these filters in this time window.<br>
       Try a wider window, or drop one of the topics.
     </p>`;
-    el("pager").innerHTML = "";
+    el("pager").textContent = "";
     return;
   }
+  el("papers").innerHTML = paperList(results.slice(0, state.shown), terms);
+  renderPager(results);
+}
 
-  el("papers").innerHTML = slice
+function paperList(papers, terms) {
+  return papers
     .map((paper) => {
       const hits = [...state.matches.get(paper.id)]
         .filter((id) => state.topics.has(id))
@@ -282,12 +340,133 @@ function renderPapers(results) {
       </article>`;
     })
     .join("");
+}
 
-  el("pager").innerHTML = pages > 1
-    ? `<button id="prev" ${state.page === 1 ? "disabled" : ""}>← previous</button>
-       <span>page ${state.page} of ${pages}</span>
-       <button id="next" ${state.page === pages ? "disabled" : ""}>next →</button>`
-    : "";
+function renderPager(results) {
+  const shown = Math.min(state.shown, results.length);
+  el("pager").textContent = shown < results.length
+    ? `${shown} of ${results.length} — keep scrolling`
+    : `all ${results.length} shown`;
+}
+
+/** Appending the next batch instead of redrawing the list keeps the cost of a
+ *  scroll proportional to the batch: jumping to the bottom of 2000 results
+ *  otherwise re-rendered everything already on screen, once per batch. */
+function growPapers(results) {
+  const from = state.shown;
+  state.shown += PAGE;
+  el("papers").insertAdjacentHTML(
+    "beforeend", paperList(results.slice(from, state.shown), parseQuery(state.query))
+  );
+  renderPager(results);
+}
+
+/** Grow the list when the sentinel below it comes into view. rootMargin starts
+ *  the next batch a screenful early, so the scroll never actually stops. */
+function watchSentinel() {
+  const sentinel = el("sentinel");
+  const observer = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    const results = currentResults();
+    if (state.shown >= results.length) return;
+    growPapers(results);
+    // An observer only reports transitions, and the sentinel can stay in view
+    // after a batch lands — on a short list, or with the group panel below it
+    // on a narrow screen. Re-observing asks for a fresh verdict, so the list
+    // keeps growing until the sentinel is genuinely out of reach.
+    observer.unobserve(sentinel);
+    observer.observe(sentinel);
+  }, { rootMargin: "800px" });
+  observer.observe(sentinel);
+}
+
+/* ---------- followed authors ---------- */
+
+const stripAccents = (text) =>
+  text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** "Matteo G. A. Paris" -> ["matteo", "paris"] */
+function nameParts(name) {
+  const tokens = stripAccents(name).replace(/\./g, " ").split(/\s+/).filter(Boolean);
+  return tokens.length > 1 ? [tokens[0], tokens.at(-1)] : ["", tokens[0] || ""];
+}
+
+/** The surname must agree, and the first name too when you gave one — without
+ *  that, following a Gupta or a Sharma returns a stranger's papers. An initial
+ *  counts as the first name, since "M. Genoni" is the same person as "Marco
+ *  Genoni". A bare surname is accepted: it is what you want for a rare name,
+ *  and your problem if it is not. */
+function authorMatches(author, [wantFirst, wantLast]) {
+  const [first, last] = nameParts(author);
+  if (last !== wantLast) return false;
+  if (!wantFirst || !first) return true;
+  return first === wantFirst || first[0] === wantFirst[0] && (first.length === 1 || wantFirst.length === 1);
+}
+
+/** Papers by one followed author. group.json is searched too: it reaches
+ *  outside quant-ph, so for a group member it can hold papers papers.json
+ *  never saw. */
+function papersBy(name) {
+  const wanted = nameParts(name);
+  const seen = new Set();
+  return [...state.papers, ...state.groupPapers]
+    .filter((paper) => {
+      if (seen.has(paper.id) || !paper.authors.some((author) => authorMatches(author, wanted))) return false;
+      seen.add(paper.id);
+      return true;
+    })
+    .sort((a, b) => (a.published < b.published ? 1 : -1));
+}
+
+function loadAuthors() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(AUTHORS_KEY) || "[]");
+    if (Array.isArray(stored)) state.authors = stored.filter((name) => typeof name === "string");
+  } catch (error) {
+    console.warn("could not read your authors:", error);
+  }
+}
+
+function saveAuthors() {
+  try {
+    localStorage.setItem(AUTHORS_KEY, JSON.stringify(state.authors));
+  } catch (error) {
+    console.warn("could not save your authors:", error);
+  }
+}
+
+/** Independent of the filters on the left, like the group panel, so it is only
+ *  redrawn when the list itself changes — scanning every author of every paper
+ *  is too much work to repeat on each keystroke in the search box. */
+function renderAuthors() {
+  if (!state.authors.length) {
+    el("followed").innerHTML = `<p class="hint">
+      Nobody yet. Add a name and their submissions show up here — and keep
+      showing up on their own as the data is refreshed every morning.
+    </p>`;
+    return;
+  }
+
+  el("followed").innerHTML = state.authors
+    .map((name) => {
+      const papers = papersBy(name);
+      const items = papers.length
+        ? papers.map((paper) => `<li class="group-item">
+            <time>${formatDate(paper.published)}</time>
+            <a href="${paper.abs_url}" target="_blank" rel="noopener">${escapeHtml(paper.title)}</a>
+          </li>`).join("")
+        : `<li class="group-empty">Nothing in the last ${state.windowDays} days.</li>`;
+      return `<div class="author">
+        <div class="author-head">
+          <span class="author-name">${escapeHtml(name)}</span>
+          <span class="count">${papers.length}</span>
+          <button class="row-action unfollow" data-author="${escapeHtml(name)}"
+            title="Stop following ${escapeHtml(name)}">×</button>
+        </div>
+        <ol class="group-list">${items}</ol>
+      </div>`;
+    })
+    .join("");
 }
 
 /** The group's own recent submissions — a static list, not affected by filters. */
@@ -318,10 +497,17 @@ function render() {
   const noun = results.length === 1 ? "paper" : "papers";
   const filtered = state.selected.size || state.query ? " matching your filters" : "";
   el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}`;
+  renderKinds();
   renderTopics();
   renderActiveFilters();
   renderPapers(results);
   syncUrl();
+}
+
+/** Every filter change starts the list from the top again. */
+function refilter() {
+  state.shown = PAGE;
+  render();
 }
 
 /* ---------- the reader's own topics, kept in localStorage ---------- */
@@ -422,6 +608,7 @@ function syncUrl() {
   if (state.selected.size) params.set("topics", [...state.selected].join(","));
   if (state.mode !== "any") params.set("mode", state.mode);
   if (state.query) params.set("q", state.query);
+  if (state.kinds.size < KINDS.length) params.set("kinds", [...state.kinds].join(","));
   history.replaceState(null, "", `?${params}`);
 }
 
@@ -434,6 +621,9 @@ function restoreFromUrl() {
   }
   if (params.get("mode") === "all") state.mode = "all";
   state.query = params.get("q") || "";
+
+  const kinds = (params.get("kinds") || "").split(",").filter((kind) => state.kinds.has(kind));
+  if (kinds.length) state.kinds = new Set(kinds);
 
   el("query").value = state.query;
   for (const button of el("window-select").children) {
@@ -459,30 +649,27 @@ function wireEvents() {
     const button = event.target.closest("button");
     if (!button) return;
     state.days = Number(button.dataset.days);
-    state.page = 1;
     for (const sibling of el("window-select").children) {
       sibling.classList.toggle("active", sibling === button);
     }
-    render();
+    refilter();
   });
 
   el("match-mode").addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
     state.mode = button.dataset.mode;
-    state.page = 1;
     for (const sibling of el("match-mode").children) {
       sibling.classList.toggle("active", sibling === button);
     }
-    render();
+    refilter();
   });
 
   el("topics").addEventListener("change", (event) => {
     const box = event.target;
     if (box.type !== "checkbox") return;
     box.checked ? state.selected.add(box.value) : state.selected.delete(box.value);
-    state.page = 1;
-    render();
+    refilter();
   });
 
   el("topics").addEventListener("click", (event) => {
@@ -500,8 +687,7 @@ function wireEvents() {
     for (const hits of state.matches.values()) hits.delete(id);
     if (state.editing === id) closeForm();
     saveTopics();
-    state.page = 1;
-    render();
+    refilter();
   });
 
   el("topic-new").addEventListener("click", () => openForm(null));
@@ -525,8 +711,7 @@ function wireEvents() {
     saveTopics();
     indexPapers();
     closeForm();
-    state.page = 1;
-    render();
+    refilter();
   });
 
   el("topics-export").addEventListener("click", exportTopics);
@@ -541,28 +726,61 @@ function wireEvents() {
     const chip = event.target.closest(".chip");
     if (!chip) return;
     state.selected.delete(chip.dataset.topic);
-    state.page = 1;
-    render();
+    refilter();
   });
 
   el("clear-topics").addEventListener("click", () => {
     state.selected.clear();
-    state.page = 1;
-    render();
+    refilter();
   });
 
   el("query").addEventListener("input", debounce((event) => {
     state.query = event.target.value;
-    state.page = 1;
-    render();
+    refilter();
   }, 200));
 
-  el("pager").addEventListener("click", (event) => {
-    if (event.target.id === "prev") state.page -= 1;
-    else if (event.target.id === "next") state.page += 1;
-    else return;
-    render();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  el("kind-filter").addEventListener("click", (event) => {
+    const button = event.target.closest(".kind");
+    if (!button) return;
+    const kind = button.dataset.kind;
+    // Turning the last one off would leave an empty page with no way back, so
+    // the final kind stays on and clicking it is a no-op.
+    if (state.kinds.has(kind)) {
+      if (state.kinds.size === 1) return;
+      state.kinds.delete(kind);
+    } else {
+      state.kinds.add(kind);
+    }
+    refilter();
+  });
+
+  el("author-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = el("author-name").value.trim();
+    if (!name) return;
+    if (state.authors.some((followed) => followed.toLowerCase() === name.toLowerCase())) {
+      el("author-hint").textContent = `You already follow ${name}.`;
+      return;
+    }
+    state.authors.push(name);
+    saveAuthors();
+    renderAuthors();
+    el("author-name").value = "";
+    const found = papersBy(name).length;
+    // Zero is not a failure: the name is kept, and the next paper by that
+    // author appears here on its own.
+    el("author-hint").textContent = found
+      ? `${found} paper${found === 1 ? "" : "s"} by ${name} in the last ${state.windowDays} days.`
+      : `Nothing by ${name} in the last ${state.windowDays} days — new ones will show up here.`;
+  });
+
+  el("followed").addEventListener("click", (event) => {
+    const button = event.target.closest(".unfollow");
+    if (!button) return;
+    state.authors = state.authors.filter((name) => name !== button.dataset.author);
+    saveAuthors();
+    renderAuthors();
+    el("author-hint").textContent = "";
   });
 
   el("theme-toggle").addEventListener("click", () => {
@@ -603,8 +821,10 @@ async function main() {
   try {
     state.papers = payload.papers;
     state.newest = new Date(payload.papers[0].published);
+    state.windowDays = payload.window_days;
 
     loadTopics();
+    loadAuthors();
     indexPapers();
 
     const generated = new Date(payload.generated_at);
@@ -615,21 +835,29 @@ async function main() {
 
     restoreFromUrl();
     wireEvents();
+    watchSentinel();
     render();
+    renderAuthors();
+    el("author-hint").textContent =
+      `Searched in the last ${state.windowDays} days of quant-ph, so work posted to another archive only shows up if it is cross-listed here.`;
   } catch (error) {
     return showFailure("Something went wrong displaying the data",
       `The data loaded, but the page failed to render it.<br>
        Try a hard refresh (<code>Ctrl/Cmd + Shift + R</code>) to clear a stale script.`, error);
   }
 
-  // The group panel is a bonus: a missing or broken group.json must not take
-  // the rest of the page down with it.
+  // The group list is a bonus: a missing or broken group.json must not take
+  // the rest of the page down with it. The followed authors live in the same
+  // column but do not depend on it, so only the group section is removed.
   try {
     const groupResponse = await fetch("data/group.json");
     if (!groupResponse.ok) throw new Error("no group data");
-    renderGroup(await groupResponse.json());
+    const group = await groupResponse.json();
+    state.groupPapers = group.papers;
+    renderGroup(group);
+    renderAuthors();   // group.json can hold papers papers.json does not
   } catch (groupError) {
-    document.querySelector(".group-panel")?.remove();
+    el("group-details")?.closest(".panel").remove();
     console.warn("group panel unavailable:", groupError);
   }
 }

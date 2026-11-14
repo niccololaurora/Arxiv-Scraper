@@ -79,18 +79,32 @@
     <div class="results-head">
       <h2 id="result-count">Loading…</h2>
     </div>
+    <div class="kinds" id="kind-filter" role="group" aria-label="Kind of submission"></div>
     <div id="active-filters" class="active-filters"></div>
     <div id="papers"></div>
-    <div id="pager" class="pager"></div>
+    <div id="sentinel"></div>
+    <p class="pager" id="pager"></p>
   </section>
 
   <aside class="group-panel">
     <section class="panel">
+      <details id="group-details" open>
+        <summary><h2>Our group</h2></summary>
+        <p class="hint" id="group-hint"></p>
+        <ol id="group-papers" class="group-list"></ol>
+      </details>
+    </section>
+
+    <section class="panel">
       <div class="panel-head">
-        <h2>From the group</h2>
+        <h2>Authors I follow</h2>
       </div>
-      <p class="hint" id="group-hint"></p>
-      <ol id="group-papers" class="group-list"></ol>
+      <form id="author-form">
+        <input id="author-name" type="text" placeholder="e.g. Matteo Paris" autocomplete="off" required>
+        <button type="submit" class="primary">Follow</button>
+      </form>
+      <p class="hint" id="author-hint"></p>
+      <div id="followed"></div>
     </section>
   </aside>
 </main>

@@ -34,7 +34,30 @@ scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
 - **`docs/app.js`** — reads your topics from `localStorage`, matches each paper
   against them once at load time, after which every filter is a set lookup.
 
-### The group panel
+### New, cross-lists and replacements
+
+Three buttons above the feed split it the way arXiv announces a day, and the
+counts always add up to the total — every paper is in exactly one:
+
+| | what it is |
+|---|---|
+| **New** | first version, submitted straight to quant-ph |
+| **Cross-lists** | submitted to another archive, cross-listed into quant-ph |
+| **Replacements** | revised since it was first submitted (v2 or later) |
+
+**Replacements are narrower here than on arXiv.** The API's date filters only
+ever match the v1 submission date — querying `lastUpdatedDate` for the last
+four days returns nothing submitted before them — so a paper from last year
+revised this morning is not in the dataset at all. What this bucket holds is
+papers submitted *inside* the window that have since gained a version.
+
+### The group panel and the authors you follow
+
+The right-hand column collapses to its heading, and under it you can follow
+any author by name. Their papers are found in the data already in the browser,
+so there is no request to make and the list updates by itself as the data is
+refreshed — but it only reaches as far as the data does: the last 35 days of
+quant-ph, plus whatever `group.json` holds for a group member.
 
 An author matches only if **both** surname and first name agree, so `M. Paris`
 counts for Matteo Paris while `Michel Paris` does not. Names alone still cannot
@@ -48,6 +71,8 @@ Details worth knowing:
 - The time window is measured **from the newest submission in the data**, not
   from the current time: arXiv publishes in daily batches, so a literal "last
   day" would be empty for most of the day.
+- The feed has no pages: it grows by 25 as you scroll, and any change of
+  filter puts you back at the top.
 - Keyword matching tolerates singular/plural (`surface code` also finds
   `surface codes`) and treats hyphens and spaces as equivalent (`non-Markovian`
   = `non Markovian`).
@@ -59,7 +84,7 @@ Details worth knowing:
   `spin squeezing` (two terms) and `"spin squeezing"` (one phrase) give
   different results.
 - Filter state is reflected in the URL, so a filtered view is shareable:
-  `?days=7&topics=gaussian-states,error-correction&mode=all`. Topic ids are
+  `?days=7&topics=gaussian-states&kinds=new,cross&mode=all`. Topic ids are
   derived from the name, so a link only resolves for someone whose own topics
   carry the same names — send them your exported JSON and it will.
 
