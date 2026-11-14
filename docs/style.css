@@ -25,6 +25,11 @@
 
 * { box-sizing: border-box; }
 
+/* The browser hides [hidden] with `display: none`, but any author rule that
+   sets `display` beats it on equal specificity — which silently left the topic
+   form and the any/all toggle on screen permanently. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
