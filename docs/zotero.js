@@ -11,7 +11,7 @@
   // Bumped whenever the tokenizer changes: a profile built by an older one
   // holds terms this one will never produce, and every score would be zero
   // without a word of explanation.
-  const VERSION = 2;
+  const VERSION = 3;
 
   const ZOTERO_API = "https://api.zotero.org";
   const ZOTERO_KEY = "zotero-account";     // {userId, key}
@@ -31,8 +31,13 @@
   however moreover furthermore thus hence therefore respectively via within obtain obtained
   quantum physics physical system systems state states`.split(/\s+/));
 
+  /** A term has to contain a letter. Bare numbers are the worst terms there
+   *  are: rare, therefore heavy, and meaning nothing — a profile came back
+   *  led by "1000". Anything with a letter in it stays, so t1, 2d and su(2)
+   *  survive. */
   const words = (text) =>
-    text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).filter(Boolean);
+    text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/)
+      .filter((word) => /[a-z]/.test(word));
 
   /** Longest suffix first, so "squeezing" loses -ing rather than -g. */
   const SUFFIXES = ["ement", "ation", "ing", "ed", "es", "s"];
@@ -135,11 +140,31 @@
     return { userId: String(info.userID), key, username: info.username || "" };
   }
 
-  async function fetchLibrary({ userId, key }, onProgress) {
+  /** Every tag in the library with how many items carry it, heaviest first.
+   *  A library is usually several subjects at once, and the profile of all of
+   *  them at once is the profile of none. */
+  async function fetchTags({ userId, key }) {
+    const tags = [];
+    for (let start = 0; ; start += PAGE_SIZE) {
+      const url = `${ZOTERO_API}/users/${encodeURIComponent(userId)}/tags` +
+        `?format=json&limit=${PAGE_SIZE}&start=${start}`;
+      const response = await fetch(url, { headers: { "Zotero-API-Key": key, "Zotero-API-Version": "3" } });
+      if (!response.ok) throw new Error(`Zotero answered ${response.status}`);
+      const page = await response.json();
+      tags.push(...page.map((entry) => ({ tag: entry.tag, items: entry.meta?.numItems || 0 })));
+      if (page.length < PAGE_SIZE) {
+        return tags.filter((entry) => entry.items > 1)
+          .sort((one, other) => other.items - one.items || one.tag.localeCompare(other.tag));
+      }
+    }
+  }
+
+  async function fetchLibrary({ userId, key, tag }, onProgress) {
     const items = [];
     for (let start = 0; ; start += PAGE_SIZE) {
       const url = `${ZOTERO_API}/users/${encodeURIComponent(userId)}/items/top` +
-        `?format=json&limit=${PAGE_SIZE}&start=${start}&itemType=-attachment%20||%20note`;
+        `?format=json&limit=${PAGE_SIZE}&start=${start}&itemType=-attachment%20||%20note` +
+        (tag ? `&tag=${encodeURIComponent(tag)}` : "");
       const response = await fetch(url, { headers: { "Zotero-API-Key": key, "Zotero-API-Version": "3" } });
       if (response.status === 403) throw new Error("Zotero refused the key — check the user id and that the key can read your library.");
       if (!response.ok) throw new Error(`Zotero answered ${response.status}`);
@@ -253,7 +278,7 @@
     profile ? localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)) : localStorage.removeItem(PROFILE_KEY);
 
   window.Zotero = {
-    identify, fetchLibrary, buildProfile, score, documentFrequencies, stem,
+    identify, fetchTags, fetchLibrary, buildProfile, score, documentFrequencies, stem,
     loadAccount, saveAccount, loadProfile, saveProfile, terms,
   };
 

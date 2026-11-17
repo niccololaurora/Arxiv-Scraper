@@ -314,6 +314,20 @@ input[type="search"]:focus, select:focus {
   font-size: 0.78rem;
   font-weight: 500;
 }
+.zotero-scope {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.zotero-scope select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.78rem;
+}
 #zotero-profile .badges { margin-top: 0.5rem; }
 #zotero-status:empty { display: none; }
 

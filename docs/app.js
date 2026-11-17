@@ -34,6 +34,7 @@ const state = {
   groupPapers: [],        // the group's own recent submissions, for the right-hand panel
   sort: "listing",        // or "mine", once a Zotero profile exists
   profile: null,          // weighted terms derived from the reader's library
+  tags: [],               // the library's own tags, with their item counts
   corpus: null,           // document frequencies over our own papers, built once
   scores: new Map(),      // paper id -> {score, because}
   minScore: 0,            // hide anything below this many percent
@@ -584,6 +585,19 @@ function profileWords(limit) {
   return shown.map((term) => state.profile.words?.[term] || term);
 }
 
+function renderScope() {
+  const account = Zotero.loadAccount();
+  el("zotero-scope").hidden = !state.profile || !state.tags.length;
+  if (el("zotero-scope").hidden) return;
+  el("zotero-tag").innerHTML = [{ tag: "", items: 0 }, ...state.tags]
+    .map(({ tag, items }) => {
+      const label = tag ? `${tag} (${items})` : "the whole library";
+      const chosen = (account?.tag || "") === tag ? "selected" : "";
+      return `<option value="${escapeHtml(tag)}" ${chosen}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
 function renderZotero() {
   const account = Zotero.loadAccount();
   el("zotero-form").hidden = Boolean(state.profile);
@@ -596,9 +610,9 @@ function renderZotero() {
     el("min-score").value = state.minScore;
     el("min-score-value").textContent = `${state.minScore}%`;
   }
+  renderScope();
   el("zotero-profile").innerHTML = state.profile
     ? `<p class="hint">
-         ${escapeHtml(account?.username || "Your library")}:
          ${state.profile.withText} of ${state.profile.items} items had a title or abstract to read.
          Built ${formatDate(state.profile.at)}.
        </p>
@@ -613,10 +627,14 @@ async function connectZotero(account) {
   try {
     say("Checking the key…");
     account = account.userId ? account : await Zotero.identify(account.key);
-    say("Reading your library…");
-    const items = await Zotero.fetchLibrary(account, (done, total) =>
-      say(`Reading your library — ${done} of ${total}…`));
-    if (!items.length) return say("That library is empty.");
+    const what = account.tag ? `everything tagged “${account.tag}”` : "your library";
+    say(`Reading ${what}…`);
+    const [items, tags] = await Promise.all([
+      Zotero.fetchLibrary(account, (done, total) => say(`Reading ${what} — ${done} of ${total}…`)),
+      state.tags.length ? Promise.resolve(state.tags) : Zotero.fetchTags(account),
+    ]);
+    state.tags = tags;
+    if (!items.length) return say(`Nothing is tagged “${account.tag}”.`);
 
     state.corpus = state.corpus || Zotero.documentFrequencies(state.papers);
     state.profile = Zotero.buildProfile(items, state.corpus);
@@ -821,6 +839,11 @@ function wireEvents() {
   el("zotero-form").addEventListener("submit", (event) => {
     event.preventDefault();
     connectZotero({ key: el("zotero-key").value.trim() });
+  });
+
+  el("zotero-tag").addEventListener("change", (event) => {
+    const account = Zotero.loadAccount();
+    if (account) connectZotero({ ...account, tag: event.target.value });
   });
 
   el("zotero-forget").addEventListener("click", () => {
