@@ -274,9 +274,25 @@ def fetch_announced(url: str, wanted: int) -> list[dict]:
             announced.append({**paper, "announced": day, "announce_type": kind})
         else:
             print(f"  no metadata for {arxiv_id}, skipped", file=sys.stderr)
-    # Newest listing first, and within a listing the newest submission first.
-    announced.sort(key=lambda paper: (paper["announced"], paper["published"]), reverse=True)
+    announced.sort(key=listing_order)
     return announced
+
+
+def listing_order(paper: dict) -> tuple:
+    """The order arXiv itself lists a day in: newest listing first, then the
+    three sections, then ascending id inside each — which is ascending
+    submission order, so a paper held back by moderation opens the listing
+    instead of being buried a hundred entries down under the day's own.
+
+    The id is compared as (yymm, number) rather than as text: ids were four
+    digits wide before 2015, and "0704.0001" must not sort beside "2611.1875".
+    """
+    yymm, _, number = paper["id"].partition(".")
+    section = {"new": 0, "cross": 1, "replace": 2}.get(paper["announce_type"], 3)
+    # The listing date is a string and has to invert for a descending sort,
+    # which a plain reverse= would also apply to the two keys that follow.
+    return (tuple(-int(part) for part in paper["announced"].split("-")),
+            section, int(yymm), int(number or 0))
 
 
 def by_date(papers) -> list[dict]:

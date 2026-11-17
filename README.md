@@ -78,6 +78,11 @@ empty it to turn the filter off.
 
 Details worth knowing:
 
+- The feed is in arXiv's own order: newest listing first, then new,
+  cross-lists and replacements, each by ascending id. That is ascending
+  submission order too, so a paper held back by moderation opens the listing
+  — where arXiv puts it — instead of being buried a hundred entries below the
+  day's own submissions.
 - The time window is counted in **arXiv listings**: "Latest" is one, "Week"
   five, "Month" twenty. Each paper carries the day it was announced, so the
   window is a lookup rather than a date calculation — no cut-off times, no

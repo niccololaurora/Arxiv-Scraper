@@ -108,8 +108,9 @@ function matchesQuery(paper, terms) {
  *  date calculation — no cut-off times, no weekends, no daylight saving. */
 const windowDays = () => new Set(state.allListings.slice(0, state.listings));
 
-/** state.papers arrives newest-first from the scraper, so filtering preserves
- *  the chronological order and nothing needs re-sorting. */
+/** state.papers arrives in arXiv's own listing order — newest listing first,
+ *  then new, cross-lists and replacements, each by ascending id — so filtering
+ *  preserves it and nothing needs re-sorting. */
 function currentResults() {
   const days = windowDays();
   const terms = parseQuery(state.query);
