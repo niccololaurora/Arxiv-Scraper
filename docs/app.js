@@ -327,7 +327,8 @@ function renderWhy(paper) {
   if (!match || match.score < 0.02) return "";
   return `<p class="why">
     <span class="why-score">${Math.floor(match.score * 100)}%</span>
-    like your library — ${match.because.map(escapeHtml).join(" · ")}
+    like your library — ${match.because
+      .map((term) => escapeHtml(state.profile.words?.[term] || term)).join(" · ")}
   </p>`;
 }
 
@@ -565,6 +566,24 @@ function refilter() {
 
 /* ---------- the Zotero panel ---------- */
 
+/** The terms worth showing: spelled the way you write them, and with a word
+ *  dropped when a pair already on display contains it — "bosonic" next to
+ *  "bosonic codes" is one idea taking two places. */
+function profileWords(limit) {
+  // Weight decides, and whatever is taken suppresses the terms that merely
+  // repeat it: "bosonic" and "bosonic codes" are one idea in two places.
+  // Checking against the whole list instead of against what is already shown
+  // threw away "squeezing" itself, for a pair three hundred places below it.
+  const shown = [];
+  for (const term of Object.keys(state.profile.terms)) {
+    const repeats = shown.some((taken) =>
+      taken.split(" ").includes(term) || term.split(" ").includes(taken));
+    if (!repeats) shown.push(term);
+    if (shown.length === limit) break;
+  }
+  return shown.map((term) => state.profile.words?.[term] || term);
+}
+
 function renderZotero() {
   const account = Zotero.loadAccount();
   el("zotero-form").hidden = Boolean(state.profile);
@@ -583,8 +602,8 @@ function renderZotero() {
          ${state.profile.withText} of ${state.profile.items} items had a title or abstract to read.
          Built ${formatDate(state.profile.at)}.
        </p>
-       <div class="badges">${Object.keys(state.profile.terms).slice(0, 8)
-         .map((term) => `<span class="badge">${escapeHtml(term)}</span>`).join("")}</div>
+       <div class="badges">${profileWords(8)
+         .map((word) => `<span class="badge">${escapeHtml(word)}</span>`).join("")}</div>
        <div class="panel-foot"><button id="zotero-refresh" class="link-button">read it again</button></div>`
     : "";
 }
@@ -984,6 +1003,9 @@ async function main() {
     state.profile = Zotero.loadProfile();
     state.minScore = Number(localStorage.getItem(SCORE_KEY)) || 0;
     rescore();
+    // An older profile was dropped by loadProfile; rebuild it rather than
+    // leave the panel looking disconnected for no reason the reader can see.
+    if (!state.profile && Zotero.loadAccount()) connectZotero(Zotero.loadAccount());
 
     restoreFromUrl();
     wireEvents();

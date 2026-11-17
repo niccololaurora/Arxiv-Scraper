@@ -8,6 +8,11 @@
 
 (() => {
 
+  // Bumped whenever the tokenizer changes: a profile built by an older one
+  // holds terms this one will never produce, and every score would be zero
+  // without a word of explanation.
+  const VERSION = 2;
+
   const ZOTERO_API = "https://api.zotero.org";
   const ZOTERO_KEY = "zotero-account";     // {userId, key}
   const PROFILE_KEY = "zotero-profile";    // the derived terms, never the library
@@ -29,6 +34,33 @@
   const words = (text) =>
     text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).filter(Boolean);
 
+  /** Longest suffix first, so "squeezing" loses -ing rather than -g. */
+  const SUFFIXES = ["ement", "ation", "ing", "ed", "es", "s"];
+
+  /** squeezing, squeezed and squeeze are one subject written three ways, and
+   *  a profile that lists them separately spends three of its slots saying
+   *  the same thing. Stems are never shown — each one remembers the spelling
+   *  it was most often written as, because "squeez" is not a word. */
+  function stem(word) {
+    let root = word;
+    // -ies is a spelling of -y, not a suffix to drop, or "theories" would
+    // stem to "theor" while "theory" stayed whole.
+    if (root.length >= 5 && root.endsWith("ies")) {
+      root = root.slice(0, -3) + "y";
+    } else if (root.length >= 5) {
+      for (const suffix of SUFFIXES) {
+        if (root.endsWith(suffix) && root.length - suffix.length >= 3) {
+          root = root.slice(0, -suffix.length);
+          break;
+        }
+      }
+    }
+    // The final -e goes from every word, short ones included: otherwise
+    // "codes" stems to "cod" and "code" stays "code", which is the opposite
+    // of the point.
+    return root.length > 3 && root.endsWith("e") ? root.slice(0, -1) : root;
+  }
+
   /** Unigrams plus bigrams: "error correction" and "phase space" mean something
    *  their halves do not, and in this field most of the signal is in the pairs. */
   function terms(text) {
@@ -36,13 +68,34 @@
     const out = [];
     for (let i = 0; i < tokens.length; i++) {
       const word = tokens[i];
-      if (word.length > 2 && !STOP.has(word)) out.push(word);
+      if (word.length > 2 && !STOP.has(word)) out.push(stem(word));
       if (i + 1 < tokens.length && !STOP.has(word) && !STOP.has(tokens[i + 1])) {
-        out.push(`${word} ${tokens[i + 1]}`);
+        out.push(`${stem(word)} ${stem(tokens[i + 1])}`);
       }
     }
     return out;
   }
+
+  /** The spellings behind the stems, so the panel can show words. */
+  function surfaces(text, into) {
+    const tokens = words(text);
+    for (let i = 0; i < tokens.length; i++) {
+      const word = tokens[i];
+      if (word.length > 2 && !STOP.has(word)) count(into, stem(word), word);
+      if (i + 1 < tokens.length && !STOP.has(word) && !STOP.has(tokens[i + 1])) {
+        count(into, `${stem(word)} ${stem(tokens[i + 1])}`, `${word} ${tokens[i + 1]}`);
+      }
+    }
+  }
+
+  function count(into, key, spelling) {
+    const seen = into.get(key) || new Map();
+    seen.set(spelling, (seen.get(spelling) || 0) + 1);
+    into.set(key, seen);
+  }
+
+  const commonest = (seen) =>
+    [...seen].sort((one, other) => other[1] - one[1])[0][0];
 
   /* ---------- the arXiv corpus as a yardstick ---------- */
 
@@ -102,12 +155,14 @@
   function buildProfile(items, corpus) {
     const weights = new Map();
     const mine = new Map();          // how many of your own items use the term
+    const spellings = new Map();     // stem -> how each spelling was written
     let used = 0;
     for (const item of items) {
       const data = item.data || {};
       const tags = (data.tags || []).map((tag) => tag.tag).join(" ");
       const text = `${data.title || ""} ${data.abstractNote || ""} ${tags}`;
       const found = terms(text);
+      surfaces(text, spellings);
       if (!found.length) continue;
       used++;
       const counts = new Map();
@@ -131,7 +186,11 @@
     const top = useful.sort((one, other) => other[1] - one[1]).slice(0, PROFILE_TERMS);
     const norm = Math.hypot(...top.map(([, weight]) => weight)) || 1;
     return {
+      version: VERSION,
       terms: Object.fromEntries(top.map(([term, weight]) => [term, weight / norm])),
+      words: Object.fromEntries(top
+        .filter(([term]) => spellings.has(term))
+        .map(([term]) => [term, commonest(spellings.get(term))])),
       items: items.length,
       withText: used,
       at: new Date().toISOString(),
@@ -183,7 +242,8 @@
 
   const loadProfile = () => {
     try {
-      return JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
+      const stored = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
+      return stored && stored.version === VERSION ? stored : null;
     } catch (error) {
       return null;
     }
@@ -193,7 +253,7 @@
     profile ? localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)) : localStorage.removeItem(PROFILE_KEY);
 
   window.Zotero = {
-    identify, fetchLibrary, buildProfile, score, documentFrequencies,
+    identify, fetchLibrary, buildProfile, score, documentFrequencies, stem,
     loadAccount, saveAccount, loadProfile, saveProfile, terms,
   };
 
