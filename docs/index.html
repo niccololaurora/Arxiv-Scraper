@@ -80,10 +80,14 @@
         <button id="zotero-forget" class="link-button" hidden>disconnect</button>
       </div>
       <form id="zotero-form">
-        <input id="zotero-user" type="text" placeholder="User ID" autocomplete="off" required>
         <input id="zotero-key" type="password" placeholder="API key" autocomplete="off" required>
         <button type="submit" class="primary">Read my library</button>
       </form>
+      <p class="hint">
+        A read-only key from
+        <a href="https://www.zotero.org/settings/keys/new" target="_blank" rel="noopener">zotero.org</a>.
+        It stays in this browser.
+      </p>
       <p class="hint" id="zotero-status" role="status"></p>
       <div id="zotero-profile"></div>
     </section>

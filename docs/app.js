@@ -553,12 +553,9 @@ function renderZotero() {
   el("zotero-form").hidden = Boolean(state.profile);
   el("zotero-forget").hidden = !state.profile;
   el("sort-order").hidden = !state.profile;
-  if (account) {
-    el("zotero-user").value = account.userId;
-  }
-
   el("zotero-profile").innerHTML = state.profile
     ? `<p class="hint">
+         ${escapeHtml(account?.username || "Your library")}:
          ${state.profile.withText} of ${state.profile.items} items had a title or abstract to read.
          Built ${formatDate(state.profile.at)}.
        </p>
@@ -571,6 +568,8 @@ function renderZotero() {
 async function connectZotero(account) {
   const say = (text) => { el("zotero-status").textContent = text; };
   try {
+    say("Checking the key…");
+    account = account.userId ? account : await Zotero.identify(account.key);
     say("Reading your library…");
     const items = await Zotero.fetchLibrary(account, (done, total) =>
       say(`Reading your library — ${done} of ${total}…`));
@@ -778,7 +777,7 @@ function wireEvents() {
 
   el("zotero-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    connectZotero({ userId: el("zotero-user").value.trim(), key: el("zotero-key").value.trim() });
+    connectZotero({ key: el("zotero-key").value.trim() });
   });
 
   el("zotero-forget").addEventListener("click", () => {

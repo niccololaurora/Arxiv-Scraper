@@ -67,6 +67,21 @@
 
   /* ---------- the library ---------- */
 
+  /** The key knows which account it belongs to, so there is no reason to make
+   *  anyone go and copy a numeric user id out of a settings page. It also
+   *  reports what the key may read, which turns "403 somewhere later" into a
+   *  sentence that says what to fix. */
+  async function identify(key) {
+    const response = await fetch(`${ZOTERO_API}/keys/${encodeURIComponent(key)}`);
+    if (response.status === 404) throw new Error("Zotero does not know that key. Check it was copied whole.");
+    if (!response.ok) throw new Error(`Zotero answered ${response.status}`);
+    const info = await response.json();
+    if (!info.access?.user?.library) {
+      throw new Error("That key cannot read your library — give it 'Allow library access' on zotero.org.");
+    }
+    return { userId: String(info.userID), key, username: info.username || "" };
+  }
+
   async function fetchLibrary({ userId, key }, onProgress) {
     const items = [];
     for (let start = 0; ; start += PAGE_SIZE) {
@@ -166,7 +181,7 @@
     profile ? localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)) : localStorage.removeItem(PROFILE_KEY);
 
   window.Zotero = {
-    fetchLibrary, buildProfile, score, documentFrequencies,
+    identify, fetchLibrary, buildProfile, score, documentFrequencies,
     loadAccount, saveAccount, loadProfile, saveProfile, terms,
   };
 
