@@ -101,6 +101,7 @@
    *  book with a 2000-word abstract does not outvote fifty papers. */
   function buildProfile(items, corpus) {
     const weights = new Map();
+    const mine = new Map();          // how many of your own items use the term
     let used = 0;
     for (const item of items) {
       const data = item.data || {};
@@ -113,10 +114,21 @@
       for (const term of found) counts.set(term, (counts.get(term) || 0) + 1);
       for (const [term, count] of counts) {
         weights.set(term, (weights.get(term) || 0) + (count / found.length) * idf(corpus, term));
+        mine.set(term, (mine.get(term) || 0) + 1);
       }
     }
 
-    const top = [...weights].sort((one, other) => other[1] - one[1]).slice(0, PROFILE_TERMS);
+    // Rarity is what gives a term its weight, and nothing stops that from
+    // running away: a word so rare that no arXiv paper contains it scores
+    // highest of all while being unable to match anything, and it still eats
+    // a slot and dilutes the normalisation. A real reader's profile came back
+    // led by "trigemini" and "generalized squeezing", neither of which exists
+    // in 3422 papers, both of them from one stray item.
+    const minItems = used >= 20 ? 2 : 1;
+    const useful = [...weights].filter(([term]) =>
+      corpus.df.get(term) && mine.get(term) >= minItems);
+
+    const top = useful.sort((one, other) => other[1] - one[1]).slice(0, PROFILE_TERMS);
     const norm = Math.hypot(...top.map(([, weight]) => weight)) || 1;
     return {
       terms: Object.fromEntries(top.map(([term, weight]) => [term, weight / norm])),
