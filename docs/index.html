@@ -98,9 +98,16 @@
       <h2 id="result-count">Loading…</h2>
     </div>
     <div class="kinds" id="kind-filter" role="group" aria-label="Kind of submission"></div>
-    <div class="segmented small" id="sort-order" role="group" aria-label="Order" hidden>
-      <button data-sort="listing" class="active">Listing order</button>
-      <button data-sort="mine">Closest to my library</button>
+    <div class="scored" id="scored" hidden>
+      <div class="segmented small" id="sort-order" role="group" aria-label="Order">
+        <button data-sort="listing" class="active">Listing order</button>
+        <button data-sort="mine">Closest to my library</button>
+      </div>
+      <label class="threshold">
+        <span>at least</span>
+        <input id="min-score" type="range" min="0" max="30" step="1" value="0">
+        <output id="min-score-value">0%</output>
+      </label>
     </div>
     <div id="active-filters" class="active-filters"></div>
     <div id="papers"></div>

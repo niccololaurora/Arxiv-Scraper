@@ -330,7 +330,28 @@ input[type="search"]:focus, select:focus {
   margin-right: 0.3rem;
 }
 
-#sort-order { max-width: 22rem; }
+.scored {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+#sort-order { margin-bottom: 0; max-width: 22rem; }
+
+.threshold {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.threshold input[type="range"] { accent-color: var(--accent); width: 8rem; }
+.threshold output {
+  min-width: 2.4rem;
+  font-weight: 600;
+  color: var(--accent);
+}
 
 .count {
   font-size: 0.7rem;

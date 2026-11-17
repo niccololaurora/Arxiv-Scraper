@@ -3,6 +3,7 @@
 const PAGE = 25;              // papers added per scroll
 const TOPICS_KEY = "my-topics";
 const AUTHORS_KEY = "followed-authors";
+const SCORE_KEY = "min-score";
 
 /** The three sections of an arXiv listing, carried in the data as
  *  announce_type rather than guessed from the metadata. Guessing was wrong in
@@ -35,6 +36,7 @@ const state = {
   profile: null,          // weighted terms derived from the reader's library
   corpus: null,           // document frequencies over our own papers, built once
   scores: new Map(),      // paper id -> {score, because}
+  minScore: 0,            // hide anything below this many percent
 };
 
 const el = (id) => document.getElementById(id);
@@ -129,6 +131,17 @@ function rescore() {
 
 const scoreOf = (paper) => state.scores.get(paper.id)?.score || 0;
 
+/** Scores live on their own scale: a library of one subject reaches 25%, a
+ *  scattered one may never pass 8%. The slider therefore ends at the best
+ *  score there is, so the whole of its travel does something. */
+const bestScore = () =>
+  // Rounded down, not up: at the end of its travel the slider should leave
+  // the best paper standing rather than cut it by a fraction of a percent.
+  Math.floor(100 * Math.max(0, ...[...state.scores.values()].map((match) => match.score)));
+
+const aboveThreshold = (paper) =>
+  !state.minScore || !state.profile || scoreOf(paper) * 100 >= state.minScore;
+
 /** state.papers arrives in arXiv's own listing order — newest listing first,
  *  then new, cross-lists and replacements, each by ascending id — so filtering
  *  preserves it and nothing needs re-sorting. */
@@ -140,6 +153,7 @@ function currentResults() {
   const kept = state.papers.filter((paper) => {
     if (!days.has(paper.announced)) return false;
     if (!state.kinds.has(paperKind(paper))) return false;
+    if (!aboveThreshold(paper)) return false;
     if (!matchesQuery(paper, terms)) return false;
     if (!selected.length) return true;
     const hits = state.matches.get(paper.id);
@@ -163,6 +177,7 @@ function topicCounts() {
   for (const paper of state.papers) {
     if (!days.has(paper.announced)) continue;
     if (!state.kinds.has(paperKind(paper))) continue;
+    if (!aboveThreshold(paper)) continue;
     if (!matchesQuery(paper, terms)) continue;
     for (const id of state.matches.get(paper.id)) {
       counts.set(id, (counts.get(id) || 0) + 1);
@@ -181,6 +196,7 @@ function kindCounts() {
 
   for (const paper of state.papers) {
     if (!days.has(paper.announced)) continue;
+    if (!aboveThreshold(paper)) continue;
     if (!matchesQuery(paper, terms)) continue;
     if (selected.length) {
       const hits = state.matches.get(paper.id);
@@ -310,7 +326,7 @@ function renderWhy(paper) {
   const match = state.scores.get(paper.id);
   if (!match || match.score < 0.02) return "";
   return `<p class="why">
-    <span class="why-score">${Math.round(match.score * 100)}%</span>
+    <span class="why-score">${Math.floor(match.score * 100)}%</span>
     like your library — ${match.because.map(escapeHtml).join(" · ")}
   </p>`;
 }
@@ -528,7 +544,8 @@ function render() {
   const window = { 1: "in the latest listing", 5: "in the last week", 20: "in the last month" }[state.listings];
   const noun = results.length === 1 ? "paper" : "papers";
   const filtered = state.selected.size || state.query ? " matching your filters" : "";
-  el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}`;
+  const above = state.minScore && state.profile ? ` at ${state.minScore}% or more like your library` : "";
+  el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}${above}`;
   const days = [...windowDays()];
   el("window-hint").textContent = days.length === 1
     ? `arXiv's quant-ph listing for ${formatDate(days[0])}.`
@@ -552,7 +569,14 @@ function renderZotero() {
   const account = Zotero.loadAccount();
   el("zotero-form").hidden = Boolean(state.profile);
   el("zotero-forget").hidden = !state.profile;
-  el("sort-order").hidden = !state.profile;
+  el("scored").hidden = !state.profile;
+  if (state.profile) {
+    const best = Math.max(bestScore(), 1);
+    el("min-score").max = best;
+    state.minScore = Math.min(state.minScore, best);
+    el("min-score").value = state.minScore;
+    el("min-score-value").textContent = `${state.minScore}%`;
+  }
   el("zotero-profile").innerHTML = state.profile
     ? `<p class="hint">
          ${escapeHtml(account?.username || "Your library")}:
@@ -800,6 +824,13 @@ function wireEvents() {
     if (account) connectZotero(account);
   });
 
+  el("min-score").addEventListener("input", (event) => {
+    state.minScore = Number(event.target.value);
+    el("min-score-value").textContent = `${state.minScore}%`;
+    localStorage.setItem(SCORE_KEY, state.minScore);
+    refilter();
+  });
+
   el("sort-order").addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
@@ -951,6 +982,7 @@ async function main() {
       `${payload.count} papers · updated ${formatDate(payload.generated_at)} ${generated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
     state.profile = Zotero.loadProfile();
+    state.minScore = Number(localStorage.getItem(SCORE_KEY)) || 0;
     rescore();
 
     restoreFromUrl();
