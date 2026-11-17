@@ -8,7 +8,7 @@ write them, and they live in your browser. Two people reading the same feed
 end up with two different sidebars, which is the point — nobody has to agree on
 how to carve up quant-ph.
 
-A Python scraper runs daily on GitHub Actions, pulls recent submissions from the
+A Python scraper runs on GitHub Actions a few times a day, pulls recent submissions from the
 [arXiv API](https://info.arxiv.org/help/api/index.html) and publishes a static
 site to GitHub Pages. No server and no database: all filtering happens in the
 browser, so it is instant.
@@ -102,7 +102,16 @@ the browser block the data `fetch`.
 ## Deploying to GitHub Pages
 
 [`update-and-deploy.yml`](.github/workflows/update-and-deploy.yml) regenerates
-the data and redeploys the site daily at 07:00 UTC, and on every push to `main`.
+the data and redeploys the site three times a day — 02:23, 09:23 and 15:23 UTC
+— and on every push to `main`.
+
+Three and not one because a scheduled workflow is not punctual: GitHub queues
+them on a best-effort basis, and a single daily `0 7` fired at 13:58, 14:34 and
+16:50 UTC on three consecutive days. The first run is the one that matters,
+since arXiv announces the day's batch at 01:00 UTC and the API only indexes it
+then; the other two bound how stale the site can get. Note also that GitHub
+**disables scheduled workflows** in a repository with no activity for 60 days,
+which is the first thing to check if the data silently stops moving.
 
 It needs to be enabled once: **Settings → Pages → Source: GitHub Actions**.
 

@@ -2,9 +2,18 @@ name: Update data and deploy site
 
 on:
   schedule:
-    # 07:00 UTC: arXiv announces the day's quant-ph batch at 01:00 UTC (20:00 ET),
-    # so by morning in Europe the data is already fresh.
-    - cron: "0 7 * * *"
+    # arXiv announces the day's quant-ph batch at 01:00 UTC (20:00 ET) and the
+    # API only indexes it then, so the first run is the one that matters; the
+    # other two bound how stale the site can get to about six hours.
+    #
+    # Three runs because a single one is not dependable: GitHub queues
+    # scheduled workflows on a best-effort basis, and a daily "0 7" fired at
+    # 13:58, 14:34 and 16:50 UTC on three consecutive days. The odd minute is
+    # deliberate for the same reason — the top of the hour is the busiest slot
+    # on the shared runners.
+    - cron: "23 2 * * *"
+    - cron: "23 9 * * *"
+    - cron: "23 15 * * *"
   push:
     branches: [main]
   workflow_dispatch:
