@@ -23,18 +23,6 @@
   --mark: #5c4a16;
 }
 
-/* Research runs the same stylesheet in violet, so you can tell at a glance
-   which of the two pages you are on. Overriding the two accent variables is
-   the whole theme: everything else already reads them. */
-.research-page {
-  --accent: #5b3a8e;
-  --accent-soft: #ece3f7;
-}
-:root[data-theme="dark"] .research-page {
-  --accent: #b48ae6;
-  --accent-soft: #2b2239;
-}
-
 * { box-sizing: border-box; }
 
 /* The browser hides [hidden] with `display: none`, but any author rule that
@@ -99,23 +87,6 @@ a { color: var(--accent); }
 .group-link span { display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
 .group-link:hover { color: var(--accent); }
 .group-link:hover span { color: var(--accent); }
-
-.tabs { display: flex; gap: 0.3rem; margin-right: auto; }
-.tabs a {
-  padding: 0.3rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 0.8rem;
-}
-.tabs a:hover { color: var(--accent); border-color: var(--accent); }
-.tabs a.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 500;
-}
 
 .icon-button {
   background: var(--surface-2);
@@ -534,68 +505,6 @@ footer {
 .author-name { flex: 1; font-size: 0.82rem; font-weight: 600; }
 .author .group-list { margin-top: 0.3rem; }
 .author .group-item:first-child { padding-top: 0.3rem; }
-
-/* ---------- research page ---------- */
-
-main.research {
-  display: block;
-  max-width: 1000px;
-}
-.research .panel { margin-bottom: 1.5rem; }
-.research .method p { margin: 0 0 0.7rem; font-size: 0.88rem; max-width: 70ch; }
-.research h2 { margin: 1.5rem 0 0.6rem; font-size: 1rem; }
-.research .method h2 { margin-top: 0; }
-.within { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
-.within input {
-  width: 12rem;
-  padding: 0.35rem 0.5rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font: inherit;
-  font-size: 0.82rem;
-}
-.within input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-
-.probe-actions { max-width: 24rem; margin-top: 0.8rem; }
-.probe-actions button { padding: 0.45rem; }
-.probe-actions button:disabled { opacity: 0.5; cursor: progress; }
-
-/* A table of 50 pairs is the one thing on the site wide enough to need its
-   own scrollbar rather than squeezing the page. */
-.table-wrap { overflow-x: auto; }
-.research table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
-.research th, .research td {
-  padding: 0.45rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: middle;
-}
-.research th {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.research td.num, .research th.num { text-align: right; white-space: nowrap; }
-.research tbody tr:hover { background: var(--surface); }
-.research .muted { color: var(--muted); }
-.research .areas { color: var(--muted); font-size: 0.76rem; }
-
-.spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 1.4rem; width: 5rem; }
-.spark i { flex: 1; background: var(--accent); opacity: 0.55; border-radius: 1px; }
-
-.research .badge { white-space: nowrap; }
-.research .badge.gap { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.research .badge.even { background: var(--surface-2); }
-.research .badge.linked { background: transparent; }
 
 /* ---------- footer ---------- */
 
