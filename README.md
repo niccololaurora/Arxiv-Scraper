@@ -68,9 +68,13 @@ empty it to turn the filter off.
 
 Details worth knowing:
 
-- The time window is measured **from the newest submission in the data**, not
-  from the current time: arXiv publishes in daily batches, so a literal "last
-  day" would be empty for most of the day.
+- The time window is counted in **arXiv listings**, not in hours. arXiv
+  announces everything submitted between two 14:00 ET cut-offs together, and
+  there is no cut-off at the weekend, so Tuesday's listing carries Friday,
+  Saturday, Sunday and Monday at once — 148 papers where a literal 24 hours
+  showed 70 of them, dated three days back. "Latest" is one listing, "Week"
+  five, "Month" twenty, and the cut-offs are counted back from the newest
+  submission so that daylight saving never enters into it.
 - The feed has no pages: it grows by 25 as you scroll, and any change of
   filter puts you back at the top.
 - Keyword matching tolerates singular/plural (`surface code` also finds
@@ -84,7 +88,7 @@ Details worth knowing:
   `spin squeezing` (two terms) and `"spin squeezing"` (one phrase) give
   different results.
 - Filter state is reflected in the URL, so a filtered view is shareable:
-  `?days=7&topics=gaussian-states&kinds=new,cross&mode=all`. Topic ids are
+  `?lists=5&topics=gaussian-states&kinds=new,cross&mode=all`. Topic ids are
   derived from the name, so a link only resolves for someone whose own topics
   carry the same names — send them your exported JSON and it will.
 

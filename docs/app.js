@@ -24,7 +24,7 @@ const state = {
   topics: new Map(),      // id -> {id, label, keywords, regex} — all of them the reader's own
   matches: new Map(),     // paper id -> Set of topic ids
   newest: null,           // most recent submission in the dataset
-  days: 1,
+  listings: 1,            // how many arXiv announcements back the window reaches
   selected: new Set(),
   kinds: new Set(KINDS.map((kind) => kind.id)),
   editing: null,          // topic id the form is editing, null when it creates a new one
@@ -106,10 +106,24 @@ function matchesQuery(paper, terms) {
 
 /* ---------- filtering ---------- */
 
+/** arXiv does not announce continuously. Everything submitted between two
+ *  14:00 ET cut-offs is announced together, and there is no cut-off at the
+ *  weekend — so Tuesday's listing carries Friday, Saturday, Sunday and Monday
+ *  in one go. A literal 24h window showed 70 of those 148 papers and dated
+ *  them three days back, which reads as a stale site rather than as what it
+ *  was: one listing, sliced.
+ *
+ *  The cut-offs are counted back from the newest submission rather than from
+ *  a wall clock, so nothing here needs to know about daylight saving or about
+ *  what time it is where the reader sits. */
 function cutoff() {
-  // Measured from the newest submission, not from "now": arXiv publishes in
-  // daily batches, so a literal 24h window is empty for most of the day.
-  return new Date(state.newest.getTime() - state.days * 86400000);
+  let instant = state.newest.getTime();
+  for (let listings = 0; listings < state.listings; ) {
+    instant -= 86400000;
+    const weekday = new Date(instant).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) listings++;   // no cut-off at the weekend
+  }
+  return new Date(instant);
 }
 
 /** state.papers arrives newest-first from the scraper, so filtering preserves
@@ -485,10 +499,13 @@ function renderGroup(payload) {
 
 function render() {
   const results = currentResults();
-  const window = { 1: "in the last day", 7: "in the last week", 30: "in the last month" }[state.days];
+  const window = { 1: "in the latest listing", 5: "in the last week", 20: "in the last month" }[state.listings];
   const noun = results.length === 1 ? "paper" : "papers";
   const filtered = state.selected.size || state.query ? " matching your filters" : "";
   el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}`;
+  el("window-hint").textContent =
+    `arXiv announces in batches, so this is counted in listings rather than in hours: ` +
+    `submissions from ${formatDate(cutoff())} to ${formatDate(state.newest)}.`;
   renderKinds();
   renderTopics();
   renderActiveFilters();
@@ -596,7 +613,7 @@ async function importTopics(file) {
 
 function syncUrl() {
   const params = new URLSearchParams();
-  params.set("days", state.days);
+  params.set("lists", state.listings);
   if (state.selected.size) params.set("topics", [...state.selected].join(","));
   if (state.mode !== "any") params.set("mode", state.mode);
   if (state.query) params.set("q", state.query);
@@ -606,8 +623,10 @@ function syncUrl() {
 
 function restoreFromUrl() {
   const params = new URLSearchParams(location.search);
-  const days = Number(params.get("days"));
-  if ([1, 7, 30].includes(days)) state.days = days;
+  // Links shared before the window counted listings carried days=1|7|30.
+  const legacy = { 1: 1, 7: 5, 30: 20 }[Number(params.get("days"))];
+  const listings = Number(params.get("lists")) || legacy;
+  if ([1, 5, 20].includes(listings)) state.listings = listings;
   for (const id of (params.get("topics") || "").split(",")) {
     if (state.topics.has(id)) state.selected.add(id);
   }
@@ -619,7 +638,7 @@ function restoreFromUrl() {
 
   el("query").value = state.query;
   for (const button of el("window-select").children) {
-    button.classList.toggle("active", Number(button.dataset.days) === state.days);
+    button.classList.toggle("active", Number(button.dataset.listings) === state.listings);
   }
   for (const button of el("match-mode").children) {
     button.classList.toggle("active", button.dataset.mode === state.mode);
@@ -640,7 +659,7 @@ function wireEvents() {
   el("window-select").addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
-    state.days = Number(button.dataset.days);
+    state.listings = Number(button.dataset.listings);
     for (const sibling of el("window-select").children) {
       sibling.classList.toggle("active", sibling === button);
     }
@@ -822,8 +841,6 @@ async function main() {
     const generated = new Date(payload.generated_at);
     el("freshness").textContent =
       `${payload.count} papers · updated ${formatDate(payload.generated_at)} ${generated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-    el("window-hint").textContent =
-      `Measured from the latest submission (${formatDate(payload.papers[0].published)}), not from the current time.`;
 
     restoreFromUrl();
     wireEvents();
