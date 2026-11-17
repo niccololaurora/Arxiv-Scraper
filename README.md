@@ -20,14 +20,17 @@ Department of Physics, University of Milan.
 
 ```
 scraper/fetch_arxiv.py   →  docs/data/papers.json   →  docs/ (static site)
-   arXiv API, stdlib            ~2200 papers             vanilla JS
+   listings + API, stdlib       ~3000 entries            vanilla JS
                           →  docs/data/group.json
                              the group's own recent submissions
 ```
 
-- **`scraper/fetch_arxiv.py`** — pages through the arXiv API over a
-  `submittedDate` window, deduplicates, and writes a compact JSON. Standard
-  library only, and it honours the 3 s delay arXiv asks for between calls.
+- **`scraper/fetch_arxiv.py`** — reads the arXiv listing for each of the last
+  20 announcement days, fetches the metadata for what it finds, and writes a
+  compact JSON. Standard library only; it honours the 3 s delay arXiv asks for
+  between API calls and the 15 s its robots.txt asks for on `/catchup`, and it
+  reuses the dataset already published so a normal run fetches one listing
+  instead of twenty.
 - **`docs/data/members.json`** — the group roster, hand-edited. The scraper
   queries arXiv for these authors and writes `group.json`, which feeds the
   "From the group" panel on the right.
@@ -45,11 +48,18 @@ counts always add up to the total — every paper is in exactly one:
 | **Cross-lists** | submitted to another archive, cross-listed into quant-ph |
 | **Replacements** | revised since it was first submitted (v2 or later) |
 
-**Replacements are narrower here than on arXiv.** The API's date filters only
-ever match the v1 submission date — querying `lastUpdatedDate` for the last
-four days returns nothing submitted before them — so a paper from last year
-revised this morning is not in the dataset at all. What this bucket holds is
-papers submitted *inside* the window that have since gained a version.
+The three counts come from arXiv itself, not from a guess about the metadata,
+and they match its listing entry for entry: 116 new, 38 cross-lists and 109
+replacements for Tuesday 17 November 2026.
+
+That took some doing. The API cannot answer "what was announced today" — its
+date filters only ever see the v1 submission date — so a paper held by
+moderation and announced a week later is invisible to it, and six of those
+were missing from a single day. The listing pages can answer it, and
+`robots.txt` allows `/catchup` with a 15 s crawl delay, so that is where
+`announced` and `announce_type` come from. Note that one paper can appear in
+two listings — posted one day, revised another — and is then two entries, as
+it is on arXiv.
 
 ### The group panel and the authors you follow
 
@@ -68,13 +78,10 @@ empty it to turn the filter off.
 
 Details worth knowing:
 
-- The time window is counted in **arXiv listings**, not in hours. arXiv
-  announces everything submitted between two 14:00 ET cut-offs together, and
-  there is no cut-off at the weekend, so Tuesday's listing carries Friday,
-  Saturday, Sunday and Monday at once — 148 papers where a literal 24 hours
-  showed 70 of them, dated three days back. "Latest" is one listing, "Week"
-  five, "Month" twenty, and the cut-offs are counted back from the newest
-  submission so that daylight saving never enters into it.
+- The time window is counted in **arXiv listings**: "Latest" is one, "Week"
+  five, "Month" twenty. Each paper carries the day it was announced, so the
+  window is a lookup rather than a date calculation — no cut-off times, no
+  weekends, no daylight saving.
 - The feed has no pages: it grows by 25 as you scroll, and any change of
   filter puts you back at the top.
 - Keyword matching tolerates singular/plural (`surface code` also finds

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import unicodedata
@@ -27,7 +28,26 @@ PAGE_SIZE = 200
 # arXiv asks for a 3 second pause between consecutive API calls.
 REQUEST_DELAY = 3.0
 MAX_RETRIES = 4
-USER_AGENT = "Scraper-Arxiv/1.0 (https://github.com/niccololaurora/Scraper)"
+USER_AGENT = "Scraper-Arxiv/1.0 (https://github.com/niccololaurora/Arxiv-Scraper)"
+
+# What arXiv announced on a given day, which is not the same question as what
+# was submitted that day: a paper held by moderation is announced days after
+# its submission date, and six of those were missing from the site on the day
+# this was written. The API cannot answer it — its date filters only ever see
+# the v1 submission date — but the catchup page can, and arXiv's robots.txt
+# allows /catchup explicitly, asking for 15 seconds between requests.
+CATCHUP_URL = "https://arxiv.org/catchup/quant-ph/{day}"
+CRAWL_DELAY = 15.0
+LISTINGS = 20          # announcement days to keep, "Month" on the site
+SECTIONS = {
+    "New submissions": "new",
+    "Cross submissions": "cross",
+    "Replacement submissions": "replace",
+}
+# Metadata already published is reused rather than fetched again: a normal run
+# then needs one catchup page and one batch of metadata instead of twenty.
+PUBLISHED_URL = "https://niccololaurora.github.io/Arxiv-Scraper/data/papers.json"
+ID_BATCH = 100
 
 NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -149,6 +169,116 @@ def fetch_all(search_query: str, papers: dict[str, dict] | None = None) -> dict[
     return papers
 
 
+# --- what arXiv announced, day by day ------------------------------------
+
+def fetch_listing(day: str) -> dict[str, str]:
+    """{arXiv id -> new|cross|replace} exactly as arXiv listed it on `day`.
+
+    Ids are read out of the <dt> elements that open each entry rather than
+    from the page at large, so an abstract quoting another paper's id cannot
+    smuggle it into the listing.
+    """
+    page = fetch_page(CATCHUP_URL.format(day=day))
+    sections = [
+        (match.start(), SECTIONS[match.group(1)])
+        for match in re.finditer(r"(%s) \(showing" % "|".join(SECTIONS), page)
+    ]
+    listing: dict[str, str] = {}
+    for entry in re.finditer(r"<dt>.*?</dt>", page, re.S):
+        found = re.search(r"/abs/(\d{4}\.\d{4,5})", entry.group(0))
+        if not found:
+            continue
+        kinds = [kind for start, kind in sections if start < entry.start()]
+        if kinds:
+            listing.setdefault(found.group(1), kinds[-1])
+    return listing
+
+
+def listing_days(wanted: int, known: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    """Walk back from today until `wanted` days with a listing are collected.
+
+    Saturdays and Sundays are skipped without asking; a weekday that comes
+    back empty is a holiday, which costs one request and does not count.
+    """
+    listings: dict[str, dict[str, str]] = {}
+    day = datetime.now(timezone.utc).date()
+    for _ in range(wanted * 2 + 14):          # a fortnight of slack for holidays
+        if len(listings) == wanted:
+            break
+        if day.weekday() < 5:
+            key = day.isoformat()
+            if key in known:
+                listings[key] = known[key]
+                print(f"  {key}: {len(known[key])} entries (already published)")
+            else:
+                found = fetch_listing(key)
+                if found:
+                    listings[key] = found
+                    print(f"  {key}: {len(found)} entries")
+                time.sleep(CRAWL_DELAY)
+        day -= timedelta(days=1)
+    return listings
+
+
+def fetch_metadata(ids: list[str], have: dict[str, dict]) -> dict[str, dict]:
+    """Metadata for ids not already carried over, in batches by id_list."""
+    missing = [arxiv_id for arxiv_id in ids if arxiv_id not in have]
+    papers = dict(have)
+    for start in range(0, len(missing), ID_BATCH):
+        batch = missing[start:start + ID_BATCH]
+        print(f"  metadata {start + 1}-{start + len(batch)} of {len(missing)}")
+        url = f"{API_URL}?{urllib.parse.urlencode({'id_list': ','.join(batch), 'max_results': ID_BATCH})}"
+        feed = ET.fromstring(fetch_page(url))
+        for entry in feed.findall("atom:entry", NS):
+            paper = parse_entry(entry)
+            if paper:
+                papers[paper["id"]] = paper
+        time.sleep(REQUEST_DELAY)
+    return papers
+
+
+def load_published(url: str) -> list[dict]:
+    """The dataset already on the site, so a run only fetches the difference."""
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return json.loads(response.read().decode("utf-8")).get("papers", [])
+    except Exception as error:                 # a cold start is not a failure
+        print(f"  no published dataset to reuse ({error})", file=sys.stderr)
+        return []
+
+
+def fetch_announced(url: str, wanted: int) -> list[dict]:
+    """Every paper arXiv announced over the last LISTINGS listing days."""
+    published = load_published(url)
+    carried = {paper["id"]: paper for paper in published}
+    known: dict[str, dict[str, str]] = {}
+    for paper in published:
+        if "announced" in paper:
+            known.setdefault(paper["announced"], {})[paper["id"]] = paper["announce_type"]
+
+    print(f"Collecting the last {wanted} arXiv listings ({len(carried)} papers already published)")
+    listings = listing_days(wanted, known)
+
+    # A list and not a dict keyed by id: the same paper is announced twice when
+    # it is posted one day and revised another, and arXiv lists it both times.
+    # Keying by id silently dropped seven replacements from a single day.
+    entries = [(arxiv_id, day, kind)
+               for day, listed in listings.items() for arxiv_id, kind in listed.items()]
+    papers = fetch_metadata(sorted({arxiv_id for arxiv_id, _, _ in entries}), carried)
+
+    announced = []
+    for arxiv_id, day, kind in entries:
+        paper = papers.get(arxiv_id)
+        if paper:
+            announced.append({**paper, "announced": day, "announce_type": kind})
+        else:
+            print(f"  no metadata for {arxiv_id}, skipped", file=sys.stderr)
+    # Newest listing first, and within a listing the newest submission first.
+    announced.sort(key=lambda paper: (paper["announced"], paper["published"]), reverse=True)
+    return announced
+
+
 def by_date(papers) -> list[dict]:
     return sorted(papers, key=lambda paper: paper["published"], reverse=True)
 
@@ -254,7 +384,10 @@ def write_json(path: Path, payload: dict) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--days", type=int, default=35, help="how far back to look")
+    parser.add_argument("--listings", type=int, default=LISTINGS,
+                        help="how many arXiv announcement days to keep")
+    parser.add_argument("--published", default=PUBLISHED_URL,
+                        help="dataset to reuse metadata from; '' to fetch everything afresh")
     parser.add_argument("--out", type=Path, default=Path("docs/data/papers.json"))
     parser.add_argument("--members", type=Path, default=Path("docs/data/members.json"))
     parser.add_argument("--group-out", type=Path, default=Path("docs/data/group.json"))
@@ -262,15 +395,16 @@ def main() -> int:
                         help="window for the group's own submissions")
     args = parser.parse_args()
 
-    papers = fetch_window(args.days)
+    papers = fetch_announced(args.published, args.listings)
     if not papers:
         print("No papers returned; leaving the existing file untouched.", file=sys.stderr)
         return 1
 
+    listings = sorted({paper["announced"] for paper in papers}, reverse=True)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_json(args.out, {
         "generated_at": generated_at,
-        "window_days": args.days,
+        "listings": listings,
         "count": len(papers),
         "papers": papers,
     })

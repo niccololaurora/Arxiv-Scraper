@@ -4,27 +4,25 @@ const PAGE = 25;              // papers added per scroll
 const TOPICS_KEY = "my-topics";
 const AUTHORS_KEY = "followed-authors";
 
-/** arXiv announces a day's quant-ph in three lists, and these reproduce them as
- *  a partition of the data — every paper lands in exactly one.
- *  "Replacement" is narrower here than on arXiv: the API's date filters only
- *  ever match the v1 submission date, so a paper submitted last year and
- *  revised today is not in the dataset at all. What we can see is a paper
- *  submitted inside the window that has since gained a version. */
+/** The three sections of an arXiv listing, carried in the data as
+ *  announce_type rather than guessed from the metadata. Guessing was wrong in
+ *  both directions: a paper held by moderation is announced days after it was
+ *  submitted, and a paper posted one day and revised the next is announced
+ *  twice — once in each section. */
 const KINDS = [
-  { id: "new", label: "New", title: "First version, submitted to quant-ph" },
-  { id: "cross", label: "Cross-lists", title: "Submitted to another archive, cross-listed to quant-ph" },
-  { id: "replace", label: "Replacements", title: "Revised since it was first submitted (v2 or later)" },
+  { id: "new", label: "New", title: "Announced as a new quant-ph submission" },
+  { id: "cross", label: "Cross-lists", title: "Announced as a cross-list from another archive" },
+  { id: "replace", label: "Replacements", title: "Announced as a revision of an earlier paper" },
 ];
 
-const paperKind = (paper) =>
-  paper.version > 1 ? "replace" : paper.primary_category === "quant-ph" ? "new" : "cross";
+const paperKind = (paper) => paper.announce_type;
 
 const state = {
   papers: [],
   topics: new Map(),      // id -> {id, label, keywords, regex} — all of them the reader's own
   matches: new Map(),     // paper id -> Set of topic ids
-  newest: null,           // most recent submission in the dataset
-  listings: 1,            // how many arXiv announcements back the window reaches
+  allListings: [],        // every announcement day in the dataset, newest first
+  listings: 1,            // how many of them the window covers
   selected: new Set(),
   kinds: new Set(KINDS.map((kind) => kind.id)),
   editing: null,          // topic id the form is editing, null when it creates a new one
@@ -33,7 +31,6 @@ const state = {
   shown: PAGE,            // how far down the infinite scroll has got
   authors: [],            // names the reader follows, as typed
   groupPapers: [],        // the group's own recent submissions, for the right-hand panel
-  windowDays: 0,          // how far back the dataset itself goes
 };
 
 const el = (id) => document.getElementById(id);
@@ -106,35 +103,20 @@ function matchesQuery(paper, terms) {
 
 /* ---------- filtering ---------- */
 
-/** arXiv does not announce continuously. Everything submitted between two
- *  14:00 ET cut-offs is announced together, and there is no cut-off at the
- *  weekend — so Tuesday's listing carries Friday, Saturday, Sunday and Monday
- *  in one go. A literal 24h window showed 70 of those 148 papers and dated
- *  them three days back, which reads as a stale site rather than as what it
- *  was: one listing, sliced.
- *
- *  The cut-offs are counted back from the newest submission rather than from
- *  a wall clock, so nothing here needs to know about daylight saving or about
- *  what time it is where the reader sits. */
-function cutoff() {
-  let instant = state.newest.getTime();
-  for (let listings = 0; listings < state.listings; ) {
-    instant -= 86400000;
-    const weekday = new Date(instant).getUTCDay();
-    if (weekday !== 0 && weekday !== 6) listings++;   // no cut-off at the weekend
-  }
-  return new Date(instant);
-}
+/** The announcement days the window covers, newest first. The scraper records
+ *  which listing each paper appeared in, so this is a lookup rather than a
+ *  date calculation — no cut-off times, no weekends, no daylight saving. */
+const windowDays = () => new Set(state.allListings.slice(0, state.listings));
 
 /** state.papers arrives newest-first from the scraper, so filtering preserves
  *  the chronological order and nothing needs re-sorting. */
 function currentResults() {
-  const since = cutoff();
+  const days = windowDays();
   const terms = parseQuery(state.query);
   const selected = [...state.selected];
 
   return state.papers.filter((paper) => {
-    if (new Date(paper.published) < since) return false;
+    if (!days.has(paper.announced)) return false;
     if (!state.kinds.has(paperKind(paper))) return false;
     if (!matchesQuery(paper, terms)) return false;
     if (!selected.length) return true;
@@ -147,11 +129,11 @@ function currentResults() {
 
 /** Per-topic counts within the current time window, ignoring topic selection. */
 function topicCounts() {
-  const since = cutoff();
+  const days = windowDays();
   const terms = parseQuery(state.query);
   const counts = new Map();
   for (const paper of state.papers) {
-    if (new Date(paper.published) < since) continue;
+    if (!days.has(paper.announced)) continue;
     if (!state.kinds.has(paperKind(paper))) continue;
     if (!matchesQuery(paper, terms)) continue;
     for (const id of state.matches.get(paper.id)) {
@@ -164,13 +146,13 @@ function topicCounts() {
 /** Per-kind counts, ignoring which kinds are switched on: a button has to be
  *  able to say what it would bring back. */
 function kindCounts() {
-  const since = cutoff();
+  const days = windowDays();
   const terms = parseQuery(state.query);
   const selected = [...state.selected];
   const counts = new Map();
 
   for (const paper of state.papers) {
-    if (new Date(paper.published) < since) continue;
+    if (!days.has(paper.announced)) continue;
     if (!matchesQuery(paper, terms)) continue;
     if (selected.length) {
       const hits = state.matches.get(paper.id);
@@ -256,8 +238,8 @@ function previewTopic() {
     return;
   }
   const regex = new RegExp(keywords.map(keywordSource).join("|"), "i");
-  const since = cutoff();
-  const inWindow = state.papers.filter((paper) => new Date(paper.published) >= since);
+  const days = windowDays();
+  const inWindow = state.papers.filter((paper) => days.has(paper.announced));
   const hits = inWindow.filter((paper) => regex.test(`${paper.title} ${paper.abstract}`));
   const sample = hits.slice(0, 2).map((paper) => paper.title).join(" · ");
   el("topic-preview").innerHTML =
@@ -330,9 +312,12 @@ function paperList(papers, terms) {
         })
         .join("");
       const crossLists = paper.categories.filter((category) => category !== "quant-ph");
+      // A replacement is dated by its revision: a 2024 paper re-announced this
+      // morning reading "2024" in a feed of today's listing is a riddle.
+      const shown = paper.announce_type === "replace" ? paper.updated : paper.published;
       return `<article class="paper">
         <div class="paper-meta">
-          <time>${formatDate(paper.published)}</time>
+          <time>${formatDate(shown)}</time>
           ${paper.version > 1 ? `<span class="tag">v${paper.version}</span>` : ""}
           ${crossLists.length ? `<span class="tag">${escapeHtml(crossLists.join(" · "))}</span>` : ""}
           <span class="arxiv-id">${escapeHtml(paper.id)}</span>
@@ -461,7 +446,7 @@ function renderAuthors() {
             <time>${formatDate(paper.published)}</time>
             <a href="${paper.abs_url}" target="_blank" rel="noopener">${escapeHtml(paper.title)}</a>
           </li>`).join("")
-        : `<li class="group-empty">Nothing in the last ${state.windowDays} days.</li>`;
+        : `<li class="group-empty">Nothing in these ${state.allListings.length} listings.</li>`;
       return `<div class="author">
         <div class="author-head">
           <span class="author-name">${escapeHtml(name)}</span>
@@ -503,9 +488,10 @@ function render() {
   const noun = results.length === 1 ? "paper" : "papers";
   const filtered = state.selected.size || state.query ? " matching your filters" : "";
   el("result-count").textContent = `${results.length} ${noun} ${window}${filtered}`;
-  el("window-hint").textContent =
-    `arXiv announces in batches, so this is counted in listings rather than in hours: ` +
-    `submissions from ${formatDate(cutoff())} to ${formatDate(state.newest)}.`;
+  const days = [...windowDays()];
+  el("window-hint").textContent = days.length === 1
+    ? `arXiv's quant-ph listing for ${formatDate(days[0])}.`
+    : `The ${days.length} arXiv listings from ${formatDate(days.at(-1))} to ${formatDate(days[0])}.`;
   renderKinds();
   renderTopics();
   renderActiveFilters();
@@ -781,8 +767,8 @@ function wireEvents() {
     // Zero is not a failure: the name is kept, and the next paper by that
     // author appears here on its own.
     el("author-hint").textContent = found
-      ? `${found} paper${found === 1 ? "" : "s"} by ${name} in the last ${state.windowDays} days.`
-      : `Nothing by ${name} in the last ${state.windowDays} days — new ones will show up here.`;
+      ? `${found} paper${found === 1 ? "" : "s"} by ${name} in the last ${state.allListings.length} listings.`
+      : `Nothing by ${name} in the last ${state.allListings.length} listings — new ones will show up here.`;
   });
 
   el("followed").addEventListener("click", (event) => {
@@ -831,8 +817,7 @@ async function main() {
   // wrong place — as it did when a cached app.js met a newer index.html.
   try {
     state.papers = payload.papers;
-    state.newest = new Date(payload.papers[0].published);
-    state.windowDays = payload.window_days;
+    state.allListings = payload.listings;
 
     loadTopics();
     loadAuthors();

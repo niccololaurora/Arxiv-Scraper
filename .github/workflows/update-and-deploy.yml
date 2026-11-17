@@ -42,8 +42,8 @@ jobs:
           python-version: "3.12"
 
       # The scraper is stdlib-only, so there is nothing to install.
-      - name: Fetch the last 35 days of quant-ph
-        run: python scraper/fetch_arxiv.py --days 35 --out docs/data/papers.json
+      - name: Fetch the last 20 arXiv listings
+        run: python scraper/fetch_arxiv.py --listings 20 --out docs/data/papers.json
 
       # Pages serves assets with max-age=600, so for ten minutes after a deploy
       # a browser can pair a cached app.js with a fresh index.html. Stamping the
