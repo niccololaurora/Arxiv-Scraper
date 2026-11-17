@@ -31,6 +31,10 @@ const state = {
   shown: PAGE,            // how far down the infinite scroll has got
   authors: [],            // names the reader follows, as typed
   groupPapers: [],        // the group's own recent submissions, for the right-hand panel
+  sort: "listing",        // or "mine", once a Zotero profile exists
+  profile: null,          // weighted terms derived from the reader's library
+  corpus: null,           // document frequencies over our own papers, built once
+  scores: new Map(),      // paper id -> {score, because}
 };
 
 const el = (id) => document.getElementById(id);
@@ -108,6 +112,23 @@ function matchesQuery(paper, terms) {
  *  date calculation — no cut-off times, no weekends, no daylight saving. */
 const windowDays = () => new Set(state.allListings.slice(0, state.listings));
 
+/* ---------- Zotero: how close a paper is to what you already read ---------- */
+
+/** Scoring every paper against the profile costs a pass over the corpus, so
+ *  it happens once per profile and is then a lookup. */
+function rescore() {
+  state.scores = new Map();
+  if (!state.profile) return;
+  state.corpus = state.corpus || Zotero.documentFrequencies(state.papers);
+  for (const paper of state.papers) {
+    if (!state.scores.has(paper.id)) {
+      state.scores.set(paper.id, Zotero.score(paper, state.profile, state.corpus));
+    }
+  }
+}
+
+const scoreOf = (paper) => state.scores.get(paper.id)?.score || 0;
+
 /** state.papers arrives in arXiv's own listing order — newest listing first,
  *  then new, cross-lists and replacements, each by ascending id — so filtering
  *  preserves it and nothing needs re-sorting. */
@@ -116,7 +137,7 @@ function currentResults() {
   const terms = parseQuery(state.query);
   const selected = [...state.selected];
 
-  return state.papers.filter((paper) => {
+  const kept = state.papers.filter((paper) => {
     if (!days.has(paper.announced)) return false;
     if (!state.kinds.has(paperKind(paper))) return false;
     if (!matchesQuery(paper, terms)) return false;
@@ -126,6 +147,12 @@ function currentResults() {
       ? selected.every((id) => hits.has(id))
       : selected.some((id) => hits.has(id));
   });
+
+  // Sorting by closeness is a different question from "what came out today",
+  // so it reorders the window rather than replacing it.
+  return state.sort === "mine" && state.profile
+    ? [...kept].sort((one, other) => scoreOf(other) - scoreOf(one))
+    : kept;
 }
 
 /** Per-topic counts within the current time window, ignoring topic selection. */
@@ -276,6 +303,18 @@ function renderActiveFilters() {
     : "";
 }
 
+/** The terms a paper shares with your library. A ranking you cannot argue
+ *  with is a ranking you cannot trust, so the reason travels with the score. */
+function renderWhy(paper) {
+  if (!state.profile) return "";
+  const match = state.scores.get(paper.id);
+  if (!match || match.score < 0.02) return "";
+  return `<p class="why">
+    <span class="why-score">${Math.round(match.score * 100)}%</span>
+    like your library — ${match.because.map(escapeHtml).join(" · ")}
+  </p>`;
+}
+
 function renderKinds() {
   const counts = kindCounts();
   el("kind-filter").innerHTML = KINDS
@@ -326,6 +365,7 @@ function paperList(papers, terms) {
         <h3><a href="${paper.abs_url}" target="_blank" rel="noopener">${highlight(paper.title, terms)}</a></h3>
         <p class="authors">${escapeHtml(formatAuthors(paper.authors))}</p>
         ${hits ? `<div class="badges">${hits}</div>` : ""}
+        ${renderWhy(paper)}
         <details class="abstract">
           <summary>Abstract</summary>
           <p>${highlight(paper.abstract, terms)}</p>
@@ -504,6 +544,54 @@ function render() {
 function refilter() {
   state.shown = PAGE;
   render();
+}
+
+/* ---------- the Zotero panel ---------- */
+
+function renderZotero() {
+  const account = Zotero.loadAccount();
+  el("zotero-form").hidden = Boolean(state.profile);
+  el("zotero-forget").hidden = !state.profile;
+  el("sort-order").hidden = !state.profile;
+  if (account) {
+    el("zotero-user").value = account.userId;
+  }
+
+  el("zotero-profile").innerHTML = state.profile
+    ? `<p class="hint">
+         ${state.profile.withText} of ${state.profile.items} items had a title or abstract to read.
+         Built ${formatDate(state.profile.at)}.
+       </p>
+       <div class="badges">${Object.keys(state.profile.terms).slice(0, 8)
+         .map((term) => `<span class="badge">${escapeHtml(term)}</span>`).join("")}</div>
+       <div class="panel-foot"><button id="zotero-refresh" class="link-button">read it again</button></div>`
+    : "";
+}
+
+async function connectZotero(account) {
+  const say = (text) => { el("zotero-status").textContent = text; };
+  try {
+    say("Reading your library…");
+    const items = await Zotero.fetchLibrary(account, (done, total) =>
+      say(`Reading your library — ${done} of ${total}…`));
+    if (!items.length) return say("That library is empty.");
+
+    state.corpus = state.corpus || Zotero.documentFrequencies(state.papers);
+    state.profile = Zotero.buildProfile(items, state.corpus);
+    if (!state.profile.withText) {
+      state.profile = null;
+      return say("None of those items had a title or abstract to learn from.");
+    }
+    Zotero.saveAccount(account);
+    Zotero.saveProfile(state.profile);
+    rescore();
+    say("");
+    renderZotero();
+    refilter();
+  } catch (error) {
+    say(error.message);
+    console.error(error);
+  }
 }
 
 /* ---------- the reader's own topics, kept in localStorage ---------- */
@@ -688,6 +776,41 @@ function wireEvents() {
     refilter();
   });
 
+  el("zotero-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    connectZotero({ userId: el("zotero-user").value.trim(), key: el("zotero-key").value.trim() });
+  });
+
+  el("zotero-forget").addEventListener("click", () => {
+    // The key goes with the profile: keeping credentials for a connection the
+    // reader has just undone would be a nasty surprise.
+    Zotero.saveAccount(null);
+    Zotero.saveProfile(null);
+    state.profile = null;
+    state.scores = new Map();
+    state.sort = "listing";
+    el("zotero-key").value = "";
+    el("zotero-status").textContent = "";
+    renderZotero();
+    refilter();
+  });
+
+  el("zotero-profile").addEventListener("click", (event) => {
+    if (event.target.id !== "zotero-refresh") return;
+    const account = Zotero.loadAccount();
+    if (account) connectZotero(account);
+  });
+
+  el("sort-order").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    state.sort = button.dataset.sort;
+    for (const sibling of el("sort-order").children) {
+      sibling.classList.toggle("active", sibling === button);
+    }
+    refilter();
+  });
+
   el("topic-new").addEventListener("click", () => openForm(null));
   el("topic-cancel").addEventListener("click", closeForm);
   el("topic-keywords").addEventListener("input", debounce(previewTopic, 200));
@@ -828,8 +951,12 @@ async function main() {
     el("freshness").textContent =
       `${payload.count} papers · updated ${formatDate(payload.generated_at)} ${generated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
 
+    state.profile = Zotero.loadProfile();
+    rescore();
+
     restoreFromUrl();
     wireEvents();
+    renderZotero();
     watchSentinel();
     render();
     renderAuthors();

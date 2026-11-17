@@ -73,6 +73,20 @@
       <p class="hint" id="topics-status" role="status"></p>
       <input type="file" id="topics-file" accept="application/json,.json" hidden>
     </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Zotero</h2>
+        <button id="zotero-forget" class="link-button" hidden>disconnect</button>
+      </div>
+      <form id="zotero-form">
+        <input id="zotero-user" type="text" placeholder="User ID" autocomplete="off" required>
+        <input id="zotero-key" type="password" placeholder="API key" autocomplete="off" required>
+        <button type="submit" class="primary">Read my library</button>
+      </form>
+      <p class="hint" id="zotero-status" role="status"></p>
+      <div id="zotero-profile"></div>
+    </section>
   </aside>
 
   <section class="results">
@@ -80,6 +94,10 @@
       <h2 id="result-count">Loading…</h2>
     </div>
     <div class="kinds" id="kind-filter" role="group" aria-label="Kind of submission"></div>
+    <div class="segmented small" id="sort-order" role="group" aria-label="Order" hidden>
+      <button data-sort="listing" class="active">Listing order</button>
+      <button data-sort="mine">Closest to my library</button>
+    </div>
     <div id="active-filters" class="active-filters"></div>
     <div id="papers"></div>
     <div id="sentinel"></div>
@@ -120,6 +138,7 @@
   <p id="freshness" class="freshness"></p>
 </footer>
 
+<script src="zotero.js?v=dev"></script>
 <script src="app.js?v=dev"></script>
 </body>
 </html>
